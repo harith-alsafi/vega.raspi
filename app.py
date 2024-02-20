@@ -3,9 +3,10 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO
 from flask_cors import CORS  # Import CORS cla
 
+
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app) 
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route('/connect')
 def connect():

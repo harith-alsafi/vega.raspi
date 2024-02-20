@@ -4,6 +4,9 @@ from flask_cors import CORS  # Import CORS cla
 from threading import Thread
 
 class VegaApi:
+    app: Flask
+    socketio: SocketIO
+    # event emitter here for tool call run 
     def __init__(self):
         self.app = Flask(__name__)
         CORS(self.app) 

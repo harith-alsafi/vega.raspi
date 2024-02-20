@@ -1,3 +1,6 @@
 RPi
 RPi.GPIO
 paho-mqtt
+flask 
+flask_socketio 
+flask_cors 

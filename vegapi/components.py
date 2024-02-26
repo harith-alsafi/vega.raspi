@@ -1,4 +1,5 @@
 from typing import Literal
+from gpiozero import LED, Button, Motor, PWMLED, OutputDevice, InputDevice, DigitalOutputDevice, DigitalInputDevice, Device
 
 component_types = Literal["sensor", "led", "motor", "relay", "button", "switch", "potentiometer", "encoder", "lcd", "buzzer", "fan", "heater", "pump", "valve", "speaker", "microphone", "camera", "display", "touchscreen", "gyroscope", "accelerometer", "magnetometer", "gps", "rfid", "nfc", "bluetooth", "wifi", "ethernet", "usb", "can", "spi", "i2c", "uart", "gpio", "adc", "dac", "pwm", "interrupt", "timer", "counter", "watchdog", "rtc", "memory", "storage", "processor", "microcontroller", "microprocessor", "fpga", "asic", "soc", "gpu", "dsp", "fpu", "cpu", "ram", "rom", "flash"]
 

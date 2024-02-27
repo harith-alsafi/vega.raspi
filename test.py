@@ -1,6 +1,9 @@
 from typing import Optional
+
+from flask import Flask
 from vegapi import VegaTools, Tool, Parameter, VegaApi
 import signal
+
 
 vega_tools = VegaTools()
 
@@ -11,24 +14,16 @@ def test_function(a: int, b: int, c:int = 3) -> int:
 def get_tools(str: Optional[str] = None):
     return vega_tools.tools
 
-def signal_handler(signum, frame):
-    print('Received signal to terminate')
-    # Perform cleanup or shutdown tasks here
-    # ...
 
-    # Exit the program
-    import sys
-    sys.exit(0)
 
-signal.signal(signal.SIGINT, signal_handler)
 
 api: VegaApi = VegaApi(onGetFunctions=get_tools)
-api.run()
+api.run_flask_app()
 
-print(vega_tools.to_json())
+
 
 
 while True:
-    print("Running...")
+    # print("Running...")
     import time
     time.sleep(1)

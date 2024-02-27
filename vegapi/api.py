@@ -90,12 +90,13 @@ class VegaApi:
             self.socketio.emit('message', message)  # Broadcast the message to all connected clients
 
     def run_flask_app(self):
-        self.socketio.run(self.app, host='0.0.0.0', port=5000, debug=False)
+        # 5000 doesnt work on windows but works on raspi 
+        self.socketio.run(self.app, host='0.0.0.0', port=7000, debug=False) 
 
     def run(self):
         flask_thread = Thread(target=self.run_flask_app)
         flask_thread.setDaemon(True)
-        
+
         def signal_handler(sig, frame):
             print("Ctrl+C pressed. Stopping Flask app...")
             print("Flask app stopped.")

@@ -1,11 +1,12 @@
 import inspect
 import json
+from typing import Callable, List
 
 class Parameter:
     name: str
     description: str
     param_type: str
-    enum: list[str]
+    enum: List[str]
     is_optional: bool
 
     def __init__(self, name: str, description: str, param_type: str, is_optional: bool = False, enum: list[str] = []):
@@ -26,10 +27,10 @@ class Tool:
     return_type: str
     name: str
     description: str
-    parameters: list[Parameter]
-    function: callable
+    parameters: List[Parameter]
+    function: Callable
 
-    def __init__(self, name: str, description: str, function: callable, return_type:str = None, parameters: list[Parameter] = []):
+    def __init__(self, name: str, description: str, function: Callable, return_type:str = None, parameters: list[Parameter] = []):
         self.name = name
         self.description = description
         self.function = function
@@ -52,15 +53,17 @@ class Tool:
             **({'parameters': parameters} if len(self.parameters) > 0 or self.return_type is not None else {}) 
         }
 
+def tools_to_json(tools: List[Tool]):
+    return json.dumps([tool.to_dict() for tool in tools], indent=4)
+
 class VegaTools:
-    tools: list[Tool]
+    tools: List[Tool]
 
     def __init__(self):
         self.tools = []
-        self.functions = []
 
     def add_tool(self, description:str, parameter_description: dict[str, str], return_type:str=None, name:str=None):
-        def decorator(func: callable):
+        def decorator(func: Callable):
             signature = inspect.signature(func)
             parameters = signature.parameters
 
@@ -84,4 +87,4 @@ class VegaTools:
         return decorator
     
     def to_json(self):
-        return json.dumps([tool.to_dict() for tool in self.tools], indent=4)
+        return tools_to_json(self.tools)

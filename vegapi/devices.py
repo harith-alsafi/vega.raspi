@@ -1,39 +1,46 @@
-from typing import Literal
-from gpiozero import LED, Button, Motor, PWMLED, OutputDevice, InputDevice, DigitalOutputDevice, DigitalInputDevice, Device
+from typing import Literal, Optional, Generic, TypeVar, List
 
-component_types = Literal["sensor", "led", "motor", "relay", "button", "switch", "potentiometer", "encoder", "lcd", "buzzer", "fan", "heater", "pump", "valve", "speaker", "microphone", "camera", "display", "touchscreen", "gyroscope", "accelerometer", "magnetometer", "gps", "rfid", "nfc", "bluetooth", "wifi", "ethernet", "usb", "can", "spi", "i2c", "uart", "gpio", "adc", "dac", "pwm", "interrupt", "timer", "counter", "watchdog", "rtc", "memory", "storage", "processor", "microcontroller", "microprocessor", "fpga", "asic", "soc", "gpu", "dsp", "fpu", "cpu", "ram", "rom", "flash"]
+device_types = Literal[
+    "pwm",
+    "digital",
+    "analog",
+    "i2c"
+];
 
-pin_types = Literal["input", "output"]
+# Define a generic type variable
+T = TypeVar('T')
 
-class Component:
+class Device(Generic[T]):
     name: str
     description: str
-    pin: int
-    component_type: component_types
-    pin_input: bool # True if input, False if output
-    value: float
-    status: bool # True if on, False if off
+    pins: List[int]
+    device_type: device_types
+    isInput: bool # True if input, False if output
+    isConnected: bool # True if connected, False if connected
+    value: T
+    frequency: Optional[float]
 
-    def __init__(self) -> None:
-        pass
-
-    def set_value(self, value: float):
-        self.value = value
-
-    def set_status(self, status: bool):
-        self.status = status
+    def __init__(self, name: str, description: str, pins: List[int], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None):
+        self.name = name
+        self.description = description
+        self.pins = pins
+        self.device_type = device_type
+        self.isInput = isInput
+        self.value = value 
+        self.frequency = frequency
 
     def to_json(self):
         return {
             "name": self.name,
             "description": self.description,
-            "value": self.value,
-            "type": self.component_type,
-            "pin": self.pin
+            "value": self.value.__str__(),
+            "type": self.device_type,
+            "pins": self.pins,
+            "isInput": self.isInput,
+            "isConnected": self.isConnected,
+            "frequency": self.frequency,
         }
 
-
-class VegaComponent:
     def __init__(self, name, value, unit, min, max, step, default):
         self.name = name
         self.value = value

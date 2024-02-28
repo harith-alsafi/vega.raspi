@@ -14,14 +14,15 @@ T = TypeVar('T')
 class Device(Generic[T]):
     name: str
     description: str
-    pins: List[int]
+    pins: List[str]
     device_type: device_types
     isInput: bool # True if input, False if output
     isConnected: bool # True if connected, False if connected
     value: T
+    hasData: bool # True if data is available, False if not
     frequency: Optional[float]
 
-    def __init__(self, name: str, description: str, pins: List[int], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None, isConnected: bool = True):
+    def __init__(self, name: str, description: str, pins: List[str], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None, isConnected: bool = True, hasData: bool = False):
         self.name = name
         self.description = description
         self.pins = pins
@@ -30,6 +31,7 @@ class Device(Generic[T]):
         self.value = value 
         self.frequency = frequency
         self.isConnected = isConnected
+        self.hasData = hasData
 
     def to_json(self):
         return {
@@ -41,6 +43,7 @@ class Device(Generic[T]):
             "isInput": self.isInput,
             "isConnected": self.isConnected,
             "frequency": self.frequency,
+            "hasData": self.hasData
         }
 
 

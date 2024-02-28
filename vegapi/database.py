@@ -21,7 +21,6 @@ class DataSeries:
             "y": self.value,
         }
 
-
 class BaseModel(Model):
     class Meta:
         database = database
@@ -29,6 +28,7 @@ class BaseModel(Model):
 class DataSeriesModel(BaseModel, DataSeries): 
     def __init__(self):
         super().__init__()
+
 
 def init_db():
     database.connect()

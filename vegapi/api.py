@@ -1,20 +1,27 @@
+import json
 from typing import Optional, Callable, List
-from flask import Flask, request, Response
+from flask import Flask, Request, request, Response
 from flask_socketio import SocketIO
 from flask_cors import CORS  # Import CORS cla
 from threading import Thread
 from vegapi.database import DataSeries
-from vegapi.devices import Device
+from vegapi.devices import Device, devices_to_json
 from vegapi.tools import Tool, tools_to_json
 import signal
 
-class RunFunction:
+class RunTool:
     name: str
     arguments: str
 
     def __init__(self, name: str, arguments: str):
         self.name = name
         self.arguments = arguments
+    
+    def to_json(self):
+        return {
+            "name": self.name,
+            "arguments": self.arguments
+        }
 
 class DataSeriesResult:
     title: str
@@ -28,66 +35,118 @@ class DataSeriesResult:
         self.xLabel = xLabel
         self.yLabel = yLabel
 
-class FunctionResult:
+    def to_json(self):
+        return {
+            "title": self.title,
+            "data": [data.to_json() for data in self.data],
+            "xLabel": self.xLabel,
+            "yLabel": self.yLabel
+        }
+
+class ToolResult:
     name: str
     result: str
-    data: DataSeriesResult
+    status: bool
+    data: Optional[DataSeriesResult]
 
-    def __init__(self, name: str, result: str):
+    def __init__(self, name: str, result: str, status: bool, data: Optional[DataSeriesResult] = None):
         self.name = name
         self.result = result
+        self.status = status
+        self.data = data
+
+    def to_json(self):
+        return {
+            "name": self.name,
+            "result": self.result,
+            "status": self.status,
+            **({'data': self.data} if self.data else {})
+        }
+    
+def run_tools_to_json(tools: List[ToolResult]):
+    return json.dumps([tool.to_json() for tool in tools], indent=4)
 
 class VegaApi:
     app: Flask
     socketio: SocketIO
-    onIndex: Callable[[], str]
     # takes list of function names
-    onGetFunctions: Callable[[Optional[str]], List[Tool]]
+    onGetTools: Callable[[Optional[List[str]]], List[Tool]]
     # takes list of RunFunction objects
-    onRunFunctions: Callable[[list[RunFunction]], list[FunctionResult]]
+    onRunTools: Callable[[list[RunTool]], list[ToolResult]]
     # takes list of component names 
-    onGetComponents: Callable[[Optional[list[str]]], list[Device]] 
+    onGetDevices: Callable[[Optional[list[str]]], list[Device]] 
 
     # event emitter here for tool call run 
-    def __init__(self, onGetFunctions: Callable[[Optional[str]], List[Tool]]):
+    def __init__(self, onGetTools: Callable[[Optional[str]], List[Tool]], onRunTools: Callable[[list[RunTool]], list[ToolResult]], onGetDevices: Callable[[Optional[list[str]]], list[Device]]):
         self.app = Flask(__name__)
         CORS(self.app) 
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")
         self.setup_routes()
-        self.onGetFunctions = onGetFunctions
+        self.onGetTools = onGetTools
+        self.onRunTools = onRunTools
+        self.onGetDevices = onGetDevices
+
+    def get_tools(self, req: Request) -> Response:
+        try:
+            json_data = req.get_json(force=True, silent=True)
+            if json_data:
+                get_tools: List[str] = json_data
+                tools = self.onGetTools(get_tools)
+                json_tools = tools_to_json(tools)
+            else:
+                raise Exception("No data provided")
+            return Response(json_tools, content_type='application/json')
+        except:
+            tools = self.onGetTools(None)
+            json_tools = tools_to_json(tools)
+            return Response(json_tools, content_type='application/json')
+ 
+    
+    def run_tools(self, req: Request) -> Response:
+        try:
+            json_data = req.get_json(force=True, silent=True)
+            if json_data:
+
+                run_tools = [RunTool(tool['name'], tool['arguments']) for tool in json_data]
+                results = self.onRunTools(run_tools)
+                json_results = run_tools_to_json(results)
+                return Response(json_results, content_type='application/json')
+            else:
+                raise Exception("No data provided")
+        except:
+            return Response("No data provided", content_type='application/json')
+
+    def get_devices(self, req: Request) -> Response:
+        try:
+            json_data = req.get_json(force=True, silent=True)
+            if json_data:
+                get_devices: List[str] = json_data
+                devices = self.onGetDevices(get_devices)
+                json_devices = devices_to_json(devices=devices)
+            else:
+                raise Exception("No data provided")
+            return Response(json_devices, content_type='application/json')
+        except:
+            devices = self.onGetDevices(None)
+            json_devices = devices_to_json(devices=devices)
+            return Response(json_devices, content_type='application/json')
 
     def setup_routes(self):
         @self.app.route('/')
         def index():
-            return self.onIndex()
+            return "Raspberry Pi Flask Server"
 
-        @self.app.route('/get-functions', methods=['GET'])
-        def get_functions():
-            try:
-                json_data = request.get_json()
-                if json_data:
-                    functions = self.onGetFunctions(json_data)
-                    json_tools = tools_to_json(functions)
-                    return Response(json_tools, content_type='application/json')
-            except:
-                functions = self.onGetFunctions(None)
-                json_tools = tools_to_json(functions)
-                return Response(json_tools, content_type='application/json')
-            
-            return None
+        @self.app.route('/get-tools', methods=['GET', 'POST'])
+        def get_tools():
+            return self.get_tools(request)
         
-        @self.app.route('/run-functions')
-        def run_functions():
-            return self.onRunFunctions()
+        @self.app.route('/run-tools', methods=['GET', 'POST'])
+        def run_tools():
+            return self.run_tools(request)
 
-        @self.app.route('/get-components')
-        def get_components():
-            return self.onGetComponents()
-
-        @self.socketio.on('message')
-        def handle_message(message):
-            print('Received message:', message)
-            self.socketio.emit('message', message)  # Broadcast the message to all connected clients
+        @self.app.route('/get-devices', methods=['GET', 'POST'])
+        def get_devices():
+            return self.get_devices(request)
 
     def run_flask_app(self):
         # 5000 doesnt work on windows but works on raspi 

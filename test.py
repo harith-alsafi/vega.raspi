@@ -1,9 +1,9 @@
+import random
 from typing import Optional
-
-from flask import Flask
+from flask import Flask, send_file
 from vegapi import VegaTools, Tool, Parameter, VegaApi, Device
-
 from vegapi import Vega, RunTool, DataSeriesResult, ToolResult
+from vegapi.database import DataSeries
 
 def get_devices(names: Optional[list[str]] = None) -> list[Device]:
     return [
@@ -14,10 +14,17 @@ def get_devices(names: Optional[list[str]] = None) -> list[Device]:
 
 def run_tools(tools: list[RunTool]) -> list[ToolResult]:
     return [
-        ToolResult(name=tool.name, result=str(tool.arguments), status=True) for tool in tools
+        ToolResult(name=tool.name, result=str(tool.arguments)) for tool in tools
     ]
 
-vega = Vega(onGetDevices=get_devices, onRunTools=run_tools)
+def every_period() -> list[DataSeries]:
+    return [
+        DataSeries(name="device1", y=str(random.randint(0, 2))),
+        DataSeries(name="device2",  y=str(random.randint(1, 3))),
+        DataSeries(name="device3", y=str(random.randint(2, 4))),
+    ]
+
+vega = Vega(onGetDevices=get_devices, onRunTools=run_tools, onEveryPeriod=every_period, period=2)
 
 @vega.add_tool(
     description="Test function", 
@@ -27,7 +34,7 @@ def test_function(a: int, b: int, c:int = 3) -> int:
     return a + b
 
 vega.run()
-
+vega.start_recording()
 
 while True:
     # print("Running...")

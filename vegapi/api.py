@@ -1,10 +1,10 @@
 import json
-from typing import Optional, Callable, List
+from typing import Literal, Optional, Callable, List, Union
 from flask import Flask, Request, request, Response
 from flask_socketio import SocketIO
 from flask_cors import CORS  # Import CORS cla
 from threading import Thread
-from vegapi.database import DataSeries
+from vegapi.database import DataSeries, DataSeriesModel
 from vegapi.devices import Device, devices_to_json
 from vegapi.tools import Tool, tools_to_json
 import signal
@@ -25,11 +25,11 @@ class RunTool:
 
 class DataSeriesResult:
     title: str
-    data: List[DataSeries]
+    data: List[DataSeriesModel]
     xLabel: str
     yLabel: str
 
-    def __init__(self, title: str, data: list[DataSeries], xLabel: str, yLabel: str):
+    def __init__(self, title: str, data: list[DataSeriesModel], xLabel: str, yLabel: str):
         self.title = title
         self.data = data
         self.xLabel = xLabel
@@ -43,41 +43,51 @@ class DataSeriesResult:
             "yLabel": self.yLabel
         }
 
+UiType = Literal["flow-chart" , "plot" , "cards" , "image"]
+
+
 class ToolResult:
     name: str
     result: str
-    status: bool
-    data: Optional[DataSeriesResult]
+    error: Optional[str]
+    data: Optional[Union[DataSeriesResult, str, Device]]
+    ui: Optional[UiType]
 
-    def __init__(self, name: str, result: str, status: bool, data: Optional[DataSeriesResult] = None):
+    def __init__(self, name: str, result: str, error: Optional[str], data: Optional[Union[DataSeriesResult, str, Device]] = None, ui: Optional[UiType] = None):
         self.name = name
         self.result = result
-        self.status = status
+        self.error = error
         self.data = data
+        self.ui = ui
 
     def to_json(self):
+        data = self.data.to_json() if isinstance(self.data, DataSeriesResult) else self.data.to_json() if isinstance(self.data, Device) else self.data
         return {
             "name": self.name,
             "result": self.result,
             "status": self.status,
-            **({'data': self.data} if self.data else {})
+            **({'data': data} if self.data else {})
         }
     
 def run_tools_to_json(tools: List[ToolResult]):
     return json.dumps([tool.to_json() for tool in tools], indent=4)
 
+GetToolsReturnType = Union[List[Tool], Response]
+RunToolsReturnType = Union[List[ToolResult], Response]
+GetDevicesReturnType = Union[List[Device], Response]
+
 class VegaApi:
     app: Flask
     socketio: SocketIO
     # takes list of function names
-    onGetTools: Callable[[Optional[List[str]]], List[Tool]]
+    onGetTools: Callable[[Optional[List[str]]], GetToolsReturnType]
     # takes list of RunFunction objects
-    onRunTools: Callable[[list[RunTool]], list[ToolResult]]
+    onRunTools: Callable[[list[RunTool]], RunToolsReturnType]
     # takes list of component names 
-    onGetDevices: Callable[[Optional[list[str]]], list[Device]] 
+    onGetDevices: Callable[[Optional[list[str]]], GetDevicesReturnType] 
 
     # event emitter here for tool call run 
-    def __init__(self, onGetTools: Callable[[Optional[str]], List[Tool]], onRunTools: Callable[[list[RunTool]], list[ToolResult]], onGetDevices: Callable[[Optional[list[str]]], list[Device]]):
+    def __init__(self, onGetTools: Callable[[Optional[str]], GetToolsReturnType], onRunTools: Callable[[list[RunTool]], RunToolsReturnType], onGetDevices: Callable[[Optional[list[str]]], GetDevicesReturnType]):
         self.app = Flask(__name__)
         CORS(self.app) 
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")
@@ -92,6 +102,8 @@ class VegaApi:
             if json_data:
                 get_tools: List[str] = json_data
                 tools = self.onGetTools(get_tools)
+                if isinstance(tools, Response):
+                    return tools
                 json_tools = tools_to_json(tools)
             else:
                 raise Exception("No data provided")
@@ -106,9 +118,10 @@ class VegaApi:
         try:
             json_data = req.get_json(force=True, silent=True)
             if json_data:
-
                 run_tools = [RunTool(tool['name'], tool['arguments']) for tool in json_data]
                 results = self.onRunTools(run_tools)
+                if isinstance(results, Response):
+                    return results
                 json_results = run_tools_to_json(results)
                 return Response(json_results, content_type='application/json')
             else:
@@ -122,6 +135,8 @@ class VegaApi:
             if json_data:
                 get_devices: List[str] = json_data
                 devices = self.onGetDevices(get_devices)
+                if isinstance(devices, Response):
+                    return devices
                 json_devices = devices_to_json(devices=devices)
             else:
                 raise Exception("No data provided")

@@ -1,5 +1,5 @@
 import json
-from typing import Literal, Optional, Generic, TypeVar, List
+from typing import Callable, Literal, Optional, Generic, TypeVar, List
 
 device_types = Literal[
     "pwm",
@@ -21,8 +21,9 @@ class Device(Generic[T]):
     value: T
     hasData: bool # True if data is available, False if not
     frequency: Optional[float]
+    onCall: Optional[Callable[[T], Optional[str]]]
 
-    def __init__(self, name: str, description: str, pins: List[str], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None, isConnected: bool = True, hasData: bool = False):
+    def __init__(self, name: str, description: str, pins: List[str], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None, isConnected: bool = True, hasData: bool = False, onCall: Optional[Callable[[T], Optional[str]]] = None):
         self.name = name
         self.description = description
         self.pins = pins
@@ -32,12 +33,20 @@ class Device(Generic[T]):
         self.frequency = frequency
         self.isConnected = isConnected
         self.hasData = hasData
+        self.onCall = onCall
+
+    def run_call(self, value: Optional[T]):
+        if self.onCall is not None:
+            result = self.onCall(value)
+            if value:
+                self.value = result
+        return None
 
     def to_json(self):
         return {
             "name": self.name,
             "description": self.description,
-            "value": self.value.__str__(),
+            "value": self.value,
             "type": self.device_type,
             "pins": self.pins,
             "isInput": self.isInput,

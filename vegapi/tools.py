@@ -10,9 +10,12 @@ class Parameter:
     is_optional: bool
 
     def __init__(self, name: str, description: str, param_type: str, is_optional: bool = False, enum: list[str] = []):
+        if param_type == "list":
+            self.param_type = "array"
+        elif param_type == "str":
+            self.param_type = "string"
         self.name = name
         self.description = description
-        self.param_type = param_type
         self.enum = enum
         self.is_optional = is_optional
 
@@ -50,7 +53,7 @@ class Tool:
         return {
             "name": self.name,
             "description": self.description,
-            **({'parameters': parameters} if len(self.parameters) > 0 or self.return_type is not None else {}) 
+            **({'parameters': parameters} if len(self.parameters) > 0 or self.return_type is not "_empty" else {}) 
         }
 
 def tools_to_json(tools: List[Tool]):

@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import List, Optional
 from vegapi import Vega, Device, RunTool, DataSeries, ToolResult, tools_to_json
 import RPi.GPIO as GPIO
 import json 
+import drivers
 
 GPIO.setwarnings(False) 
 GPIO.setmode(GPIO.BCM) 
@@ -23,27 +24,36 @@ led3 = Device(name="LED3", description="Blue LED light", value=False, pins=["22"
 GPIO.setup(22, GPIO.OUT, initial=GPIO.LOW)
 
 lcd = Device(name="LCD", description="LCD display 20x4", value="Hello World", pins=["3"], device_type="i2c", isInput=False)
+display = drivers.Lcd()
 
 camera = Device(name="Camera", description="Raspberry Pi Camera", value="none", pins=["4"], device_type="i2c", isInput=False)
 
-devices = [led1, led2, led3, lcd, camera]
+devices: List[Device] = [led1, led2, led3, lcd, camera]
 
 def get_devices(names: Optional[list[str]] = None) -> list[Device]:
-   return devices
+   for device in devices:
+      if device.isInput:
+         device.run_call(None)
+      return devices
 
 def run_tools(tools: list[RunTool]) -> list[ToolResult]:
    if tools:
       results = []
       for tool in tools:
+         argJson = json.loads(tool.arguments)
          if tool.name == "set_led":
-            argJson = json.loads(tool.arguments)
             ledName =  argJson["name"]
             value = argJson["value"]
             set_led(ledName, value)
-            toolCall =ToolResult(name=tool.name, result="LED is now " + value)
+            toolCall = ToolResult(name=tool.name, result="LED is now " + value)
+            print(toolCall.to_json())
             results.append(toolCall)
          elif tool.name == "print_lcd":
-            pass
+            text = argJson["text"]
+            print_lcd(text)
+            toolCall = ToolResult(name=tool.name, result="LCD is now " + text)
+            print(toolCall.to_json())
+            results.append(toolCall)
          elif tool.name == "capture_image":
             pass
       return results
@@ -97,7 +107,8 @@ def get_stats():
    }
 )
 def print_lcd(text: str):
-   pass
+   display.lcd_clear()
+   display.lcd_display_string(text, 1) 
 
 @vega.add_tool(
    description="Captures an image from the raspberry pi camera", 
@@ -105,6 +116,15 @@ def print_lcd(text: str):
 def capture_image():
    pass
 
+
+@vega.add_tool(
+   description="Gets the status of the devices",
+   parameter_description={
+      "devices": "List of devices to get the status of given in comma seperated format, for example it can be 'LED1, LED2' it is optional so when not given it will fetch all the devices"
+   }
+)
+def get_devices_status(devices: str):
+   pass
 
 vega.run()
 

@@ -53,7 +53,7 @@ class ToolResult:
     data: Optional[Union[DataSeriesResult, str, Device]]
     ui: Optional[UiType]
 
-    def __init__(self, name: str, result: str, error: Optional[str], data: Optional[Union[DataSeriesResult, str, Device]] = None, ui: Optional[UiType] = None):
+    def __init__(self, name: str, result: str, error: Optional[str] = None, data: Optional[Union[DataSeriesResult, str, Device]] = None, ui: Optional[UiType] = None):
         self.name = name
         self.result = result
         self.error = error
@@ -65,8 +65,9 @@ class ToolResult:
         return {
             "name": self.name,
             "result": self.result,
-            "status": self.status,
-            **({'data': data} if self.data else {})
+            "error": self.error,
+            "ui": self.ui,
+            "data": self.data
         }
     
 def run_tools_to_json(tools: List[ToolResult]):
@@ -119,6 +120,7 @@ class VegaApi:
             json_data = req.get_json(force=True, silent=True)
             if json_data:
                 run_tools = [RunTool(tool['name'], tool['arguments']) for tool in json_data]
+                print(run_tools)
                 results = self.onRunTools(run_tools)
                 if isinstance(results, Response):
                     return results
@@ -126,7 +128,8 @@ class VegaApi:
                 return Response(json_results, content_type='application/json')
             else:
                 raise Exception("No data provided")
-        except:
+        except Exception as e:
+            print(e)
             return Response("No data provided", content_type='application/json')
 
     def get_devices(self, req: Request) -> Response:

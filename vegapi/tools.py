@@ -62,7 +62,7 @@ class VegaTools:
     def __init__(self):
         self.tools = []
 
-    def add_tool(self, description:str, parameter_description: dict[str, str], return_type:str=None, name:str=None):
+    def add_tool(self, description:str, parameter_description: dict[str, str]=None, return_type:str=None, name:str=None):
         def decorator(func: Callable):
             signature = inspect.signature(func)
             parameters = signature.parameters

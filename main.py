@@ -3,6 +3,9 @@ from vegapi import Vega, Device, RunTool, DataSeries, ToolResult, tools_to_json
 import RPi.GPIO as GPIO
 import json 
 import drivers
+from picamera2 import Picamera2
+import pyimgur
+import datetime
 
 GPIO.setwarnings(False) 
 GPIO.setmode(GPIO.BCM) 
@@ -27,6 +30,11 @@ lcd = Device(name="LCD", description="LCD display 20x4", value="Hello World", pi
 display = drivers.Lcd()
 
 camera = Device(name="Camera", description="Raspberry Pi Camera", value="none", pins=["4"], device_type="i2c", isInput=False)
+picam2 = Picamera2()
+config = picam2.create_still_configuration()
+picam2.configure(config)
+CLIENT_ID = "d84708345365a2b"
+im = pyimgur.Imgur(CLIENT_ID)
 
 devices: List[Device] = [led1, led2, led3, lcd, camera]
 
@@ -55,7 +63,9 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
             print(toolCall.to_json())
             results.append(toolCall)
          elif tool.name == "capture_image":
-            pass
+            url = capture_image()
+            toolCall = ToolResult(name=tool.name, result="Image has been captured and uploaded", ui="image", data=url)
+            results.append(toolCall)
       return results
    return [
    
@@ -111,11 +121,17 @@ def print_lcd(text: str):
    display.lcd_display_string(text, 1) 
 
 @vega.add_tool(
-   description="Captures an image from the raspberry pi camera", 
+   description="Captures an image from the raspberry pi camera and returns the URL", 
 )
-def capture_image():
-   pass
-
+def capture_image() -> str:
+   imgName = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+   imgPath = "images/" + imgName + ".jpg"
+   picam2.start()
+   picam2.capture_array()
+   picam2.capture_file(imgPath)
+   picam2.stop()
+   uploaded_image = im.upload_image(path=imgPath, title=imgName)
+   return uploaded_image.link
 
 @vega.add_tool(
    description="Gets the status of the devices",

@@ -13,6 +13,12 @@ from tabulate import tabulate
 GPIO.setwarnings(False) 
 GPIO.setmode(GPIO.BCM) 
 
+def find_device(name: str) -> Optional[Device]:
+   for device in devices:
+      if device.name.lower() == name.lower():
+         return device
+   return None
+
 def led_call(value: bool, pin: int) -> Optional[str]:
    if value:
       GPIO.output(pin, GPIO.HIGH)
@@ -78,7 +84,7 @@ devices: List[Device] = [led1, led2, led3, lcd, camera, ultrasonic]
 
 def get_devices(names: Optional[list[str]] = None) -> list[Device]:
    for device in devices:
-      if device.isInput:
+      if device.isInput == False:
          device.run_call(None)
       return devices
 
@@ -101,6 +107,10 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
          elif tool.name == "capture_image":
             url = capture_image()
             toolCall = ToolResult(name=tool.name, result="Image has been captured and uploaded", ui="image", data=url)
+            results.append(toolCall)
+         elif tool.name == "get_stats":
+            stats = get_stats()
+            toolCall = ToolResult(name=tool.name, result="Extracted the CPU, RAM, disk and uptime", ui="table", data=stats)
             results.append(toolCall)
       return results
    return [
@@ -134,48 +144,32 @@ def set_led(name: str, value: str) -> int:
 @vega.add_tool(
    description="Gets array of sensor data", 
    parameter_description={
-      "name": "name of the Sensor ex: SENSOR1",
+      "sensorNames": "List of sensors to get the data of given in comma seperated format, for example it can be 'SENSOR1, SENSOR2' it is optional so when not given it will fetch all the devices",
       "interval": "Interval in seconds to get the data, for example last 300 seconds"
    }
 )
-def get_sensor_data(name: str, interval: str) -> float:
+def get_sensor_data(sensorNames: str, interval: str) -> list[DataSeries]:
    pass
-
-def get_cpu_temp():
-    try:
-        with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
-            temp = f.read().strip()
-            return f'{float(temp) / 1000:.2f} °C'
-    except FileNotFoundError:
-        return 'N/A'
-
-def get_cpu_usage():
-    return f'{psutil.cpu_percent(interval=1):.2f} %'
-
-def get_ram_usage():
-    ram = psutil.virtual_memory()
-    return f'{ram.percent:.2f} %'
-
-def get_disk_usage():
-    disk = psutil.disk_usage('/')
-    return f'{disk.percent:.2f} %'
-
-def get_system_uptime():
-    uptime = psutil.boot_time()
-    return f'Uptime: {round(time.time() - uptime)} seconds'
-
-
 
 @vega.add_tool(
    description="Gets the information of the raspberry pi such as RAM, CPU, etc.", 
 )
 def get_stats() -> str:
    # Collect data
-   cpu_temp = get_cpu_temp()
-   cpu_usage = get_cpu_usage()
-   ram_usage = get_ram_usage()
-   disk_usage = get_disk_usage()
-   uptime = get_system_uptime()
+   cpu_temp = 'N/A'
+   try:
+      with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+         temp = f.read().strip()
+         cpu_temp = f'{float(temp) / 1000:.2f} °C'
+   except FileNotFoundError:
+      cpu_temp = 'N/A'
+   cpu_usage = f'{psutil.cpu_percent(interval=1):.2f} %'
+   ram = psutil.virtual_memory()
+   ram_usage = f'{ram.percent:.2f} %'
+   disk = psutil.disk_usage('/')
+   disk_usage =  f'{disk.percent:.2f} %'
+   uptime = psutil.boot_time()
+   uptime = f'Uptime: {round(time.time() - uptime)} seconds'
    # Create Markdown table
    table_data = [
       ['CPU Temperature', cpu_temp],
@@ -219,7 +213,7 @@ def capture_image() -> str:
       "devices": "List of devices to get the status of given in comma seperated format, for example it can be 'LED1, LED2' it is optional so when not given it will fetch all the devices"
    }
 )
-def get_devices_status(devices: str):
+def get_devices_status(devices: str) -> List[Device]:
    pass
 
 vega.run()

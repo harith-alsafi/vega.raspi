@@ -43,7 +43,7 @@ class DataSeriesResult:
             "yLabel": self.yLabel
         }
 
-UiType = Literal["flow-chart" , "plot" , "cards" , "image"]
+UiType = Literal["flow-chart" , "plot" , "cards" , "image", "table", "map"]
 
 
 class ToolResult:

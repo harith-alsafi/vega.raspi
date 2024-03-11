@@ -21,9 +21,9 @@ class Device(Generic[T]):
     value: T
     hasData: bool # True if data is available, False if not
     frequency: Optional[float]
-    onCall: Optional[Callable[[T], Optional[str]]]
+    onCall: Optional[Callable[[Optional[T]], Optional[T]]]
 
-    def __init__(self, name: str, description: str, pins: List[str], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None, isConnected: bool = True, hasData: bool = False, onCall: Optional[Callable[[T], Optional[str]]] = None):
+    def __init__(self, name: str, description: str, pins: List[str], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None, isConnected: bool = True, hasData: bool = False, onCall: Optional[Callable[[T], Optional[T]]] = None):
         self.name = name
         self.description = description
         self.pins = pins

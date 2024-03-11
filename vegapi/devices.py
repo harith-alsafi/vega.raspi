@@ -35,10 +35,10 @@ class Device(Generic[T]):
         self.hasData = hasData
         self.onCall = onCall
 
-    def run_call(self, value: Optional[T]):
+    def run_call(self, value: Optional[T] = None):
         if self.onCall is not None:
             result = self.onCall(value)
-            if value:
+            if result:
                 self.value = result
         return None
 

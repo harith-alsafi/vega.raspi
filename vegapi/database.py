@@ -1,18 +1,10 @@
 from typing import Callable, List
-from peewee import Model, SqliteDatabase, CharField
+from peewee import Model, SqliteDatabase, CharField, IntegerField
 from threading import Thread
 import time
 import signal
 
 database = SqliteDatabase('vega.db')
-
-class DataSeries:
-    name: str
-    y: str
-
-    def __init__(self, name, y):
-        self.name = name
-        self.y = y
 
 class BaseModel(Model):
     class Meta:
@@ -20,7 +12,7 @@ class BaseModel(Model):
 
 class DataSeriesModel(BaseModel): 
     name = CharField()
-    x = CharField()
+    x = IntegerField()
     y = CharField()
     period = CharField()
 
@@ -32,6 +24,65 @@ class DataSeriesModel(BaseModel):
             "period": self.period.__str__()
         }
 
+class PeriodicData:
+    name: str
+    y: str
+
+    def __init__(self, name: str, y: str):
+        self.name = name
+        self.y = y
+
+class SinglePlot(PeriodicData):
+    x: int
+    period: str
+
+    def __init__(self, name: str, x: int, y: str, period: str):
+        super().__init__(name, y)
+        self.x = x
+        self.period = period
+
+    def to_json(self):
+        return {
+            "name": self.name,
+            "x": self.x.__str__(),
+            "y": self.y,
+            "period": self.period
+        }
+
+class DataSeries: 
+    name: str
+    data: List[SinglePlot]
+
+    def __init__(self, name: str, data: List[SinglePlot]):
+        self.name = name
+        self.data = data
+    
+    def to_json(self):
+        return {
+            "name": self.name,
+            "data": [d.to_json() for d in self.data]
+        }
+
+class DataPlot:
+    title: str
+    x_label: str
+    y_label: str
+    data: List[DataSeries]
+
+    def __init__(self, title: str, x_label: str, y_label: str, data: List[DataSeries]):
+        self.title = title
+        self.x_label = x_label
+        self.y_label = y_label
+        self.data = data
+
+    def to_json(self):
+        return {
+            "title": self.title,
+            "xLabel": self.x_label,
+            "yLabel": self.y_label,
+            "data": [d.to_json() for d in self.data]
+        }
+
 def init_db():
     database.connect()
     database.create_tables([DataSeriesModel])
@@ -39,11 +90,11 @@ def init_db():
 class Database:
     time: int # in seconds
     period: int # in seconds
-    onEveryPeriod: Callable[[], List[DataSeries]]
+    onEveryPeriod: Callable[[], List[PeriodicData]]
     thread: Thread
     is_running: bool = False
 
-    def __init__(self, onEveryPeriod: Callable[[], List[DataSeries]], period: int = 2):
+    def __init__(self, onEveryPeriod: Callable[[], List[PeriodicData]], period: int = 2):
         init_db()
         self.database = database
         self.period = period
@@ -73,7 +124,7 @@ class Database:
         self.is_running = False
         self.thread.join()
 
-    def add_data_batch(self, data: List[DataSeries]):
+    def add_data_batch(self, data: List[PeriodicData]):
         x = str(self.time)
         self.time += self.period
         for record in data:
@@ -84,22 +135,22 @@ class Database:
         self.time += self.period
         DataSeriesModel.create(name=name, x=x, y=y, period=self.period.__str__())
 
-    def get_data_series(self, name: str) -> List[DataSeriesModel]:
+    def get_data_series(self, name: str) -> List[SinglePlot]:
         return list(DataSeriesModel.select().where(DataSeriesModel.name == name).execute())
 
-    def get_data_series_by_period(self, name: str, period: str) -> List[DataSeriesModel]:
+    def get_data_series_by_period(self, name: str, period: str) -> List[SinglePlot]:
         return list(DataSeriesModel.select().where(DataSeriesModel.name == name and DataSeriesModel.period == period).execute())
     
-    def get_data_series_last_n(self, name: str, n: int) -> List[DataSeriesModel]:
+    def get_data_series_last_n(self, name: str, n: int) -> List[SinglePlot]:
         data = DataSeriesModel.select().where(DataSeriesModel.name == name).order_by(DataSeriesModel.x.desc()).limit(n).execute()
         results: List[DataSeriesModel] = list(data)
         sorted_results = sorted(results, key=lambda x: x.x)
         return sorted_results
     
-    def get_all_data_series_by_seconds(self, name:str, seconds: int) -> List[DataSeriesModel]:
+    def get_all_data_series_by_seconds(self, name:str, seconds: int) -> List[SinglePlot]:
         return self.get_data_series_last_n(name, seconds // self.period)
 
-    def get_all_data_series(self) -> List[DataSeriesModel]:
+    def get_all_data_series(self) -> List[SinglePlot]:
         return list(DataSeriesModel.select().execute())
 
     def delete_all_data_series(self):

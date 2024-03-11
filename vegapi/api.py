@@ -4,7 +4,7 @@ from flask import Flask, Request, request, Response
 from flask_socketio import SocketIO
 from flask_cors import CORS  # Import CORS cla
 from threading import Thread
-from vegapi.database import DataSeries, DataSeriesModel
+from vegapi.database import DataPlot, DataSeries, DataSeriesModel
 from vegapi.devices import Device, devices_to_json
 from vegapi.tools import Tool, tools_to_json
 import signal
@@ -23,37 +23,16 @@ class RunTool:
             "arguments": self.arguments
         }
 
-class DataSeriesResult:
-    title: str
-    data: List[DataSeriesModel]
-    xLabel: str
-    yLabel: str
-
-    def __init__(self, title: str, data: list[DataSeriesModel], xLabel: str, yLabel: str):
-        self.title = title
-        self.data = data
-        self.xLabel = xLabel
-        self.yLabel = yLabel
-
-    def to_json(self):
-        return {
-            "title": self.title,
-            "data": [data.to_json() for data in self.data],
-            "xLabel": self.xLabel,
-            "yLabel": self.yLabel
-        }
-
 UiType = Literal["flow-chart" , "plot" , "cards" , "image", "table", "map"]
-
 
 class ToolResult:
     name: str
     result: str
     error: Optional[str]
-    data: Optional[Union[DataSeriesResult, str, Device]]
+    data: Optional[Union[DataPlot, str, Device]]
     ui: Optional[UiType]
 
-    def __init__(self, name: str, result: str, error: Optional[str] = None, data: Optional[Union[DataSeriesResult, str, Device]] = None, ui: Optional[UiType] = None):
+    def __init__(self, name: str, result: str, error: Optional[str] = None, data: Optional[Union[DataPlot, str, Device]] = None, ui: Optional[UiType] = None):
         self.name = name
         self.result = result
         self.error = error
@@ -61,7 +40,7 @@ class ToolResult:
         self.ui = ui
 
     def to_json(self):
-        data = self.data.to_json() if isinstance(self.data, DataSeriesResult) else self.data.to_json() if isinstance(self.data, Device) else self.data
+        data = self.data.to_json() if isinstance(self.data, DataPlot) else self.data.to_json() if isinstance(self.data, Device) else self.data
         return {
             "name": self.name,
             "result": self.result,

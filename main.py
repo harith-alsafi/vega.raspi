@@ -1,5 +1,5 @@
 from typing import List, Optional
-from vegapi import Vega, Device, RunTool, DataSeries, ToolResult, tools_to_json
+from vegapi import Vega, Device, RunTool, SinglePlot , ToolResult, tools_to_json 
 import RPi.GPIO as GPIO
 import json 
 import drivers
@@ -9,6 +9,8 @@ import datetime
 import time
 import psutil
 from tabulate import tabulate
+
+from vegapi.database import DataPlot, DataSeries, PeriodicData
 
 GPIO.setwarnings(False) 
 GPIO.setmode(GPIO.BCM) 
@@ -78,7 +80,9 @@ picam2.configure(config)
 CLIENT_ID = "d84708345365a2b"
 im = pyimgur.Imgur(CLIENT_ID)
 
-ultrasonic = Device(name="Ultrasonic", description="Ultrasonic distance sensor in cm", value=0.0, pins=["23", "24"], device_type="analog", isInput=True, onCall=lambda: ultrasonic_call())
+ultrasonic = Device(name="Ultrasonic", description="Ultrasonic distance sensor in cm", value=0.0, pins=["23", "24"], device_type="analog", isInput=True, onCall=lambda x: ultrasonic_call())
+GPIO.setup(23, GPIO.OUT)
+GPIO.setup(24, GPIO.IN)
 
 devices: List[Device] = [led1, led2, led3, lcd, camera, ultrasonic]
 
@@ -117,9 +121,10 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
    
    ]
 
-def every_period() -> list[DataSeries]:
+def every_period() -> List[PeriodicData]:
+   ultrasonic.run_call()
    return [
-      
+      PeriodicData(name=ultrasonic.name, y=ultrasonic.value)
    ]
 
 vega = Vega(onGetDevices=get_devices, onRunTools=run_tools, onEveryPeriod=every_period, period=2)
@@ -133,7 +138,7 @@ vega = Vega(onGetDevices=get_devices, onRunTools=run_tools, onEveryPeriod=every_
 )
 def set_led(name: str, value: str) -> int:
    # find the device from devices list using the name
-   device:Device = [device for device in devices if device.name == name][0]
+   device:Device = find_device(name)
    if device:
       # convert value from string to boolean 
       boolVal = value.lower() == "true" or value == "1" or value == "on"
@@ -148,8 +153,33 @@ def set_led(name: str, value: str) -> int:
       "interval": "Interval in seconds to get the data, for example last 300 seconds"
    }
 )
-def get_sensor_data(sensorNames: str, interval: str) -> list[DataSeries]:
-   pass
+def get_sensor_data(sensorNames: str, interval: str) -> DataPlot:
+   if "," in sensorNames:
+      sensorNames = devices.split(",")
+      devicesList: List[Device] = []
+      data: List[DataSeries] = []
+      for sensorName in sensorNames:
+         device = find_device(sensorName)
+         if device and device.isInput:
+            deviceData = vega.get_data_series_by_period(sensorName, interval)
+            data.append(DataSeries(name=sensorName, data=deviceData))
+      plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values")
+      return plot
+   elif sensorNames != "" and sensorNames != "all" and sensorNames != " ":
+      device = find_device(sensorNames)
+      if device and device.isInput:
+         deviceData = vega.get_data_series_by_period(sensorNames, interval)
+         data = [DataSeries(name=sensorNames, data=deviceData)]
+         plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values")
+         return plot
+   else:
+      data: List[DataSeries] = []
+      for device in devices:
+         if device.isInput:
+            deviceData = vega.get_data_series_by_period(device.name, interval)
+            data.append(DataSeries(name=device.name, data=deviceData))
+      plot = DataPlot(title="All Sensors", x_label="Time (s)", y_label="Values")
+
 
 @vega.add_tool(
    description="Gets the information of the raspberry pi such as RAM, CPU, etc.", 
@@ -210,13 +240,34 @@ def capture_image() -> str:
 @vega.add_tool(
    description="Gets the status of the devices",
    parameter_description={
-      "devices": "List of devices to get the status of given in comma seperated format, for example it can be 'LED1, LED2' it is optional so when not given it will fetch all the devices"
+      "deviceNames": "List of devices to get the status of given in comma seperated format, for example it can be 'LED1, LED2' it is optional so when not given it will fetch all the devices"
    }
 )
-def get_devices_status(devices: str) -> List[Device]:
-   pass
+def get_devices_status(deviceNames: str) -> List[Device]:
+   if "," in deviceNames:
+      deviceNames = devices.split(",")
+      devicesList: List[Device] = []
+      for deviceName in deviceNames:
+         device = find_device(deviceName)
+         if device:
+            if device.isInput == False:
+               device.run_call(None)
+            devicesList.append(device)
+      return devicesList
+   elif deviceNames != "" and deviceNames != "all" and deviceNames != " ":
+      device = find_device(deviceNames)
+      if device:
+         if device.isInput == False:
+            device.run_call(None)
+      return [device]
+   else:
+      for device in devices:
+         if device.isInput == False:
+            device.run_call(None)
+      return devices
 
 vega.run()
+vega.start_recording()
 
 print(tools_to_json(vega.tools))
 

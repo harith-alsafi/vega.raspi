@@ -18,7 +18,7 @@ GPIO.setmode(GPIO.BCM)
 def get_temp_humidity() -> tuple[float, float]:
    sensor = Adafruit_DHT.DHT11
    pin = 4
-   humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
+   humidity, temperature = Adafruit_DHT.read(sensor, pin)
    return (temperature, humidity)
 
 def find_device(name: str) -> Optional[Device]:
@@ -68,6 +68,12 @@ GPIO.setup(22, GPIO.OUT, initial=GPIO.LOW)
 lcd = Device(name="LCD", description="LCD display 16x4 with blue backlit", value="Hello World", pins=["SDA", "SCL"], device_type="i2c", isInput=False)
 display = drivers.Lcd()
 
+# set up motor circuit + pins
+motor = Device(name="MTR", description="Motor", value=0.0, pins=["5", "6"], device_type="pwm", isInput=False, onCall=lambda x: 0.0)
+
+# set up buzzer circuit + pins
+buzzer = Device(name="BZR", description="Buzzer", value=0.0, pins=["12"], device_type="pwm", isInput=False, onCall=lambda x: 0.0)
+
 camera = Device(name="CAM", description="Raspberry Pi Camera", value="none", pins=["PI-CAM"], device_type="i2c", isInput=False)
 picam2 = Picamera2()
 config = picam2.create_still_configuration()
@@ -79,9 +85,16 @@ ultrasonic = Device(name="ULTS", description="Ultrasonic distance sensor in cm",
 GPIO.setup(23, GPIO.OUT)
 GPIO.setup(24, GPIO.IN)
 
+# set up circuit + pins for DHT11
 temperature = Device(name="TMP", description="Temperature sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp_humidity()[0])
 
 humidity = Device(name="HDT", description="Humidity sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp_humidity()[1])
+
+# set up light sensor circuit + pins use LDR + capacitor
+light = Device(name="LGT", description="Light sensor", value=0.0, pins=["18"], device_type="analog", isInput=True, onCall=lambda x: 0.0)
+
+# set up infrared sensor circuit + pins
+infrared = Device(name="IR", description="Infrared sensor", value=True, pins=["25"], device_type="digital", isInput=True, onCall=lambda x: True)
 
 devices: List[Device] = [led1, led2, led3, lcd, camera, ultrasonic, temperature, humidity]
 

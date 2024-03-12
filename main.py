@@ -9,11 +9,17 @@ import datetime
 import time
 import psutil
 from tabulate import tabulate
-
 from vegapi.database import DataPlot, DataSeries, PeriodicData
+import Adafruit_DHT
 
 GPIO.setwarnings(False) 
 GPIO.setmode(GPIO.BCM) 
+
+def get_temp_humidity() -> tuple[float, float]:
+   sensor = Adafruit_DHT.DHT11
+   pin = 4
+   humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
+   return (temperature, humidity)
 
 def find_device(name: str) -> Optional[Device]:
    for device in devices:
@@ -42,22 +48,11 @@ def ultrasonic_call() -> float:
    # this means the ping has been sent
    while GPIO.input(24) == 0:
       pass
-   # start the time - use system time
    echoStartTime = time.time()
-   # wait for echo pin to go down to zero
    while GPIO.input(24) == 1:
       pass
    echoStopTime = time.time()
-   # calculate ping travel time
    pingTravelTime = echoStopTime - echoStartTime
-   # Use the time to calculate the distance to the target.
-   # speed of sound at 72 deg F is 344.44 m/s
-   # from weather.gov/epz/wxcalc_speedofsound.
-   # equations used by calculator at website above.
-   # speed of sound = 643.855*((temp_in_kelvin/273.15)^0.5)
-   # temp_in_kelvin = ((5/9)*(temp_in_F - 273.15)) + 32
-   #
-   # divide in half since the time of travel is out and back
    dist_cm = (pingTravelTime*34444)/2
    return dist_cm
 
@@ -73,18 +68,22 @@ GPIO.setup(22, GPIO.OUT, initial=GPIO.LOW)
 lcd = Device(name="LCD", description="LCD display 16x4 with blue backlit", value="Hello World", pins=["SDA", "SCL"], device_type="i2c", isInput=False)
 display = drivers.Lcd()
 
-camera = Device(name="Camera", description="Raspberry Pi Camera", value="none", pins=["PI-CAM"], device_type="i2c", isInput=False)
+camera = Device(name="CAM", description="Raspberry Pi Camera", value="none", pins=["PI-CAM"], device_type="i2c", isInput=False)
 picam2 = Picamera2()
 config = picam2.create_still_configuration()
 picam2.configure(config)
 CLIENT_ID = "d84708345365a2b"
 im = pyimgur.Imgur(CLIENT_ID)
 
-ultrasonic = Device(name="Ultrasonic", description="Ultrasonic distance sensor in cm", value=0.0, pins=["23", "24"], device_type="analog", isInput=True, onCall=lambda x: ultrasonic_call())
+ultrasonic = Device(name="ULTS", description="Ultrasonic distance sensor in cm", value=0.0, pins=["23", "24"], device_type="analog", isInput=True, onCall=lambda x: ultrasonic_call())
 GPIO.setup(23, GPIO.OUT)
 GPIO.setup(24, GPIO.IN)
 
-devices: List[Device] = [led1, led2, led3, lcd, camera, ultrasonic]
+temperature = Device(name="TMP", description="Temperature sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp_humidity()[0])
+
+humidity = Device(name="HDT", description="Humidity sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp_humidity()[1])
+
+devices: List[Device] = [led1, led2, led3, lcd, camera, ultrasonic, temperature, humidity]
 
 def get_devices(names: Optional[list[str]] = None) -> list[Device]:
    for device in devices:
@@ -116,16 +115,29 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
             stats = get_stats()
             toolCall = ToolResult(name=tool.name, result="Extracted the CPU, RAM, disk and uptime", ui="table", data=stats)
             results.append(toolCall)
+         elif tool.name == "get_sensor_data":
+            sensorNames = argJson["sensorNames"]
+            interval = argJson["interval"]
+            data = get_sensor_data(sensorNames, interval)
+            toolCall = ToolResult(name=tool.name, result="Extracted the sensor data", ui="plot", data=data)
+            results.append(toolCall)
+         elif tool.name == "get_devices":
+            deviceNames = argJson["deviceNames"]
+            devices = get_devices(deviceNames)
+            toolCall = ToolResult(name=tool.name, result="Extracted the devices data", ui="cards", data=devices)
+            results.append(toolCall)
       return results
    return [
    
    ]
 
 def every_period() -> List[PeriodicData]:
-   ultrasonic.run_call()
-   return [
-      PeriodicData(name=ultrasonic.name, y=ultrasonic.value)
-   ]
+   data: List[PeriodicData] = []
+   for device in devices:
+      if device.isInput:
+         device.run_call(None)
+         data.append(PeriodicData(name=device.name, y=device.value))
+   return data
 
 vega = Vega(onGetDevices=get_devices, onRunTools=run_tools, onEveryPeriod=every_period, period=2)
 
@@ -165,7 +177,7 @@ def get_sensor_data(sensorNames: str, interval: str) -> DataPlot:
             data.append(DataSeries(name=sensorName, data=deviceData))
       plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values")
       return plot
-   elif sensorNames != "" and sensorNames != "all" and sensorNames != " ":
+   elif sensorNames != "" and sensorNames.lower() != "all" and sensorNames != " ":
       device = find_device(sensorNames)
       if device and device.isInput:
          deviceData = vega.get_data_series_by_period(sensorNames, interval)
@@ -238,12 +250,12 @@ def capture_image() -> str:
    return uploaded_image.link
 
 @vega.add_tool(
-   description="Gets the status of the devices",
+   description="Gets information of the devices",
    parameter_description={
       "deviceNames": "List of devices to get the status of given in comma seperated format, for example it can be 'LED1, LED2' it is optional so when not given it will fetch all the devices"
    }
 )
-def get_devices_status(deviceNames: str) -> List[Device]:
+def get_devices(deviceNames: str) -> List[Device]:
    if "," in deviceNames:
       deviceNames = devices.split(",")
       devicesList: List[Device] = []

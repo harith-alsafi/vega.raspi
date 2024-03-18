@@ -53,7 +53,7 @@ class Tool:
         return {
             "name": self.name,
             "description": self.description,
-            **({'parameters': parameters} if len(self.parameters) > 0 or self.return_type is not "_empty" else {}) 
+            **({'parameters': parameters} if len(self.parameters) > 0 else {}) 
         }
 
 def tools_to_json(tools: List[Tool]):

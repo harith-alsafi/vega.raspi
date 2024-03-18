@@ -10,16 +10,31 @@ import time
 import psutil
 from tabulate import tabulate
 from vegapi.database import DataPlot, DataSeries, PeriodicData
-import Adafruit_DHT
+import time
+import adafruit_dht
+import board
 
 GPIO.setwarnings(False) 
 GPIO.setmode(GPIO.BCM) 
+GPIO.cleanup()
 
-def get_temp_humidity() -> tuple[float, float]:
-   sensor = Adafruit_DHT.DHT11
-   pin = 4
-   humidity, temperature = Adafruit_DHT.read(sensor, pin)
-   return (temperature, humidity)
+def get_temp() -> Optional[float]:
+   try:
+      temperature_c =  dht_device.temperature
+      if temperature_c:
+         return float(temperature_c)
+      return temperature_c
+   except RuntimeError as err:
+      return None
+   
+def get_humidity() -> Optional[float]:
+   try:
+      humidity =  dht_device.humidity
+      if humidity:
+         return float(humidity)
+      return humidity
+   except RuntimeError as err:
+      return None
 
 def find_device(name: str) -> Optional[Device]:
    for device in devices:
@@ -85,10 +100,10 @@ ultrasonic = Device(name="ULTS", description="Ultrasonic distance sensor in cm",
 GPIO.setup(23, GPIO.OUT)
 GPIO.setup(24, GPIO.IN)
 
-# set up circuit + pins for DHT11
-temperature = Device(name="TMP", description="Temperature sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp_humidity()[0])
+dht_device = adafruit_dht.DHT11(board.D4)
+temperature = Device(name="TMP", description="Temperature sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp())
 
-humidity = Device(name="HDT", description="Humidity sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp_humidity()[1])
+humidity = Device(name="HDT", description="Humidity sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_humidity())
 
 # set up light sensor circuit + pins use LDR + capacitor
 light = Device(name="LGT", description="Light sensor", value=0.0, pins=["18"], device_type="analog", isInput=True, onCall=lambda x: 0.0)
@@ -131,13 +146,15 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
          elif tool.name == "get_sensor_data":
             sensorNames = argJson["sensorNames"]
             interval = argJson["interval"]
-            data = get_sensor_data(sensorNames, interval)
-            toolCall = ToolResult(name=tool.name, result="Extracted the sensor data", ui="plot", data=data)
+            data: DataPlot = get_sensor_data(sensorNames, interval)
+            print(data.to_json())
+            toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the plot is shown above", ui="plot", data=data.to_json())
             results.append(toolCall)
          elif tool.name == "get_devices":
             deviceNames = argJson["deviceNames"]
-            devices = get_devices(deviceNames)
-            toolCall = ToolResult(name=tool.name, result="Extracted the devices data", ui="cards", data=devices)
+            devices: List[Device] = get_devices(deviceNames)
+            arrayString = [device.to_json() for device in devices]
+            toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the connect devices will be shown above", ui="cards", data=arrayString)
             results.append(toolCall)
       return results
    return [
@@ -172,38 +189,41 @@ def set_led(name: str, value: str) -> int:
       return 1
 
 @vega.add_tool(
-   description="Gets array of sensor data", 
+   description="Gets sensor data and shows it to the user", 
    parameter_description={
       "sensorNames": "List of sensors to get the data of given in comma seperated format, for example it can be 'SENSOR1, SENSOR2' it is optional so when not given it will fetch all the devices",
       "interval": "Interval in seconds to get the data, for example last 300 seconds"
    }
 )
 def get_sensor_data(sensorNames: str, interval: str) -> DataPlot:
+   seconds = int(interval)
    if "," in sensorNames:
-      sensorNames = devices.split(",")
-      devicesList: List[Device] = []
+      sensorNamesArray = sensorNames.split(",")
+
       data: List[DataSeries] = []
-      for sensorName in sensorNames:
-         device = find_device(sensorName)
+      for sensorName in sensorNamesArray:
+         sensor = sensorName.strip()
+         device = find_device(sensor)
          if device and device.isInput:
-            deviceData = vega.get_data_series_by_period(sensorName, interval)
-            data.append(DataSeries(name=sensorName, data=deviceData))
-      plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values")
+            deviceData = vega.get_all_data_series_by_seconds(sensor, seconds)
+            data.append(DataSeries(name=sensor, data=deviceData))
+      plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values", data=data)
       return plot
    elif sensorNames != "" and sensorNames.lower() != "all" and sensorNames != " ":
       device = find_device(sensorNames)
       if device and device.isInput:
-         deviceData = vega.get_data_series_by_period(sensorNames, interval)
+         deviceData = vega.get_all_data_series_by_seconds(sensorNames, seconds)
          data = [DataSeries(name=sensorNames, data=deviceData)]
-         plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values")
+         plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values", data=data)
          return plot
    else:
       data: List[DataSeries] = []
       for device in devices:
          if device.isInput:
-            deviceData = vega.get_data_series_by_period(device.name, interval)
+            deviceData = vega.get_all_data_series_by_seconds(device.name, seconds)
             data.append(DataSeries(name=device.name, data=deviceData))
-      plot = DataPlot(title="All Sensors", x_label="Time (s)", y_label="Values")
+      plot = DataPlot(title="All Sensors", x_label="Time (s)", y_label="Values", data=data)
+      return plot
 
 
 @vega.add_tool(
@@ -263,9 +283,9 @@ def capture_image() -> str:
    return uploaded_image.link
 
 @vega.add_tool(
-   description="Gets information of the devices",
+   description="Gets the list of all connected device and their informatiom",
    parameter_description={
-      "deviceNames": "List of devices to get the status of given in comma seperated format, for example it can be 'LED1, LED2' it is optional so when not given it will fetch all the devices"
+      "deviceNames": "List of devices to get the information of given in comma seperated format, for example it can be 'LED1, LED2' it is optional so when not given it will fetch all the devices"
    }
 )
 def get_devices(deviceNames: str) -> List[Device]:
@@ -292,6 +312,7 @@ def get_devices(deviceNames: str) -> List[Device]:
       return devices
 
 vega.run()
+vega.delete_all_data_series()
 vega.start_recording()
 
 print(tools_to_json(vega.tools))

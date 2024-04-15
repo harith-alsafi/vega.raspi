@@ -17,6 +17,7 @@ import board
 import serial               #import serial pacakge
 import sys   
 import pigpio
+from typing import Dict
 
 
 GPIO.setwarnings(False) 
@@ -65,7 +66,7 @@ fan = Device(name="FAN", description="On off Fan connected to a 5v relay", value
 GPIO.setup(12, GPIO.OUT, initial=GPIO.LOW)
 
 ## CAMERA
-camera = Device(name="CAM", description="Raspberry Pi Camera", value="none", pins=["PI-CAM"], device_type="i2c", isInput=False)
+camera = Device(name="CAM", description="Raspberry Pi Camera", value="none", pins=["PI-CAM"], device_type="i2c", isInput=True)
 picam2 = Picamera2()
 config = picam2.create_still_configuration()
 picam2.configure(config)
@@ -96,7 +97,7 @@ def ultrasonic_call() -> float:
    pingTravelTime = echoStopTime - echoStartTime
    dist_cm = (pingTravelTime*34444)/2
    return dist_cm
-ultrasonic = Device(name="ULTS", description="Ultrasonic distance sensor in cm", value=0.0, pins=["23", "24"], device_type="analog", isInput=True, onCall=lambda x: ultrasonic_call())
+ultrasonic = Device(name="ULTS", description="Ultrasonic distance sensor in cm", value=0.0, pins=["23", "24"], device_type="analog", isInput=True, onCall=lambda x: ultrasonic_call(),  hasRecordedData=True)
 
 ## TEMP
 dht_device = adafruit_dht.DHT11(board.D4)
@@ -108,7 +109,7 @@ def get_temp() -> Optional[float]:
       return temperature_c
    except RuntimeError as err:
       return None
-temperature = Device(name="TMP", description="Temperature sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp())
+temperature = Device(name="TMP", description="Temperature sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp(),  hasRecordedData=True)
 
 ## HUMIDITY
 def get_humidity() -> Optional[float]:
@@ -119,16 +120,18 @@ def get_humidity() -> Optional[float]:
       return humidity
    except RuntimeError as err:
       return None
-humidity = Device(name="HDT", description="Humidity sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_humidity())
+humidity = Device(name="HDT", description="Humidity sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_humidity(),  hasRecordedData=True)
 
 ## BUTTON 
-def get_button() -> bool:
-   pass
-button_gpio = 5
+button_gpio = 21
 GPIO.setup(button_gpio, GPIO.IN)
-button_status = False
 button_count = 0
-button = Device(name="BTN", description="Button which toggles states, starting by false and also has a counter for how many times it was clicked", value=False, pins=["5"], device_type="digital", isInput=True, onCall=lambda x: button_status)
+button = Device(name="BTN", description="Button which has a variable counter for how many times it was clicked", value=0, pins=["21"], device_type="digital", isInput=True, onCall=lambda x: button_count)
+
+# switch 
+switch_gpio = 19
+GPIO.setup(switch_gpio, GPIO.IN)
+switch = Device(name="SWT", description="Switch which can be on or off", value=0, pins=["19"], device_type="digital", isInput=True, onCall=lambda x: int(GPIO.input(switch_gpio) == GPIO.HIGH))
 
 ## GPS
 gpgga_info = "$GPGGA,"
@@ -137,7 +140,6 @@ GPGGA_buffer = 0
 NMEA_buff = 0
 lat_in_degrees = 0
 long_in_degrees = 0
-gps = Device(name="GPS", description="GPS module", value="none", pins=["15"], device_type="serial", isInput=False, onCall=lambda x: True)
 def GPS_Info():
     global NMEA_buff
     global lat_in_degrees
@@ -158,12 +160,14 @@ def GPS_Info():
     lat_in_degrees = convert_to_degrees(lat)    #get latitude in degree decimal format
     long_in_degrees = convert_to_degrees(longi) #get longitude in degree decimal format
 def convert_to_degrees(raw_value):
-    decimal_value = raw_value/100.00
-    degrees = int(decimal_value)
-    mm_mmmm = (decimal_value - int(decimal_value))/0.6
-    position = degrees + mm_mmmm
-    position = "%.4f" %(position)
-    return position
+   decimal_value = raw_value/100.00
+   degrees = int(decimal_value)
+   mm_mmmm = (decimal_value - int(decimal_value))/0.6
+   position = degrees + mm_mmmm
+   position = "%.4f" %(position)
+   return position
+
+gps = Device(name="GPS", description="GPS module", value="none", pins=["15"], device_type="serial", isInput=True, onCall=lambda x: get_location())
 
 devices: List[Device] = [led1, led2, led3, lcd,  camera, ultrasonic, temperature, humidity, gps, servo, fan]
 
@@ -197,16 +201,16 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
             stats = get_raspberry_stats()
             toolCall = ToolResult(name=tool.name, result="Extracted the CPU, RAM, disk and uptime", ui="table", data=stats)
             results.append(toolCall)
-         elif tool.name == "get_recorded_data":
+         elif tool.name == "get_recorded__sensor_data":
             sensorNames = argJson["sensorNames"]
             interval = argJson["interval"]
-            data: DataPlot = get_recorded_data(sensorNames, interval)
+            data: DataPlot = get_recorded__sensor_data(sensorNames, interval)
             print(data.to_json())
             toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the plot is shown above", ui="plot", data=data.to_json())
             results.append(toolCall)
-         elif tool.name == "get_devices":
+         elif tool.name == "get_connected_devices":
             deviceNames = argJson["deviceNames"]
-            devices: List[Device] = get_devices(deviceNames)
+            devices: List[Device] = get_connected_devices(deviceNames)
             arrayString = [device.to_json() for device in devices]
             toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the connect devices will be shown above", ui="cards", data=arrayString)
             results.append(toolCall)
@@ -232,7 +236,7 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
 def every_period() -> List[PeriodicData]:
    data: List[PeriodicData] = []
    for device in devices:
-      if device.isInput:
+      if device.hasRecordedData:
          device.run_call(None)
          data.append(PeriodicData(name=device.name, y=device.value))
    return data
@@ -275,7 +279,7 @@ def set_fan(value: str):
       "interval": "Interval in seconds to get the data, for example last 300 seconds"
    }
 )
-def get_recorded_data(sensorNames: str, interval: str) -> DataPlot:
+def get_recorded__sensor_data(sensorNames: str, interval: str) -> DataPlot:
    seconds = int(interval)
    if "," in sensorNames:
       sensorNamesArray = sensorNames.split(",")
@@ -284,14 +288,14 @@ def get_recorded_data(sensorNames: str, interval: str) -> DataPlot:
       for sensorName in sensorNamesArray:
          sensor = sensorName.strip()
          device = find_device(sensor)
-         if device and device.isInput:
+         if device and device.hasRecordedData:
             deviceData = vega.get_all_data_series_by_seconds(sensor, seconds)
             data.append(DataSeries(name=sensor, data=deviceData))
       plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values", data=data)
       return plot
    elif sensorNames != "" and sensorNames.lower() != "all" and sensorNames != " ":
       device = find_device(sensorNames)
-      if device and device.isInput:
+      if device and device.hasRecordedData:
          deviceData = vega.get_all_data_series_by_seconds(sensorNames, seconds)
          data = [DataSeries(name=sensorNames, data=deviceData)]
          plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values", data=data)
@@ -299,7 +303,7 @@ def get_recorded_data(sensorNames: str, interval: str) -> DataPlot:
    else:
       data: List[DataSeries] = []
       for device in devices:
-         if device.isInput:
+         if device.hasRecordedData:
             deviceData = vega.get_all_data_series_by_seconds(device.name, seconds)
             data.append(DataSeries(name=device.name, data=deviceData))
       plot = DataPlot(title="All Sensors", x_label="Time (s)", y_label="Values", data=data)
@@ -335,14 +339,23 @@ def get_raspberry_stats() -> str:
    markdown_table = tabulate(table_data, headers=['Metric', 'Value'], tablefmt='pipe')
    return markdown_table
 
+def dynamic_format(input_string: str) ->str:
+   values: Dict[str, str] = []
+   for device in devices:
+      if device.isInput:
+         device.run_call(None)
+      values[device.name] = str(device.value)
+   return input_string.format(**values)
+
 @vega.add_tool(
    description="Prints the text on the LCD screen", 
    parameter_description={
-      "text": "Text to print on the LCD screen"
+      "text": "Text to print on the LCD screen, you can add formatting in the string which will get filled with values of components, for example 'Temperature: {TMP}'",
    }
 )
 def print_lcd(text: str):
    display.lcd_clear()
+
    display.lcd_display_string(text, 1) 
    lcd.value = text
 
@@ -366,7 +379,7 @@ def capture_image() -> str:
       "deviceNames": "List of devices to get the information of or fetch data from, given in comma seperated format, for example it can be 'TMP, LED2' (this is optional so when not given it will fetch all the devices)"
    }
 )
-def get_devices(deviceNames: str) -> List[Device]:
+def get_connected_devices(deviceNames: str) -> List[Device]:
    if "," in deviceNames:
       deviceNames = devices.split(",")
       devicesList: List[Device] = []
@@ -418,6 +431,12 @@ def set_servo_angles(angles: str) -> str:
       return "Success"
    return "No angle given"
 
+def test_output_circuit():
+   pass
+
+def test_input_circuit():
+   pass
+
 vega.run()
 vega.delete_all_data_series()
 vega.start_recording()
@@ -425,10 +444,25 @@ vega.start_recording()
 print(tools_to_json(vega.tools))
 
 status = True
+reset_button_gpio = 5
+GPIO.setup(reset_button_gpio, GPIO.IN)
 while status:
-   button_status = GPIO.input(button_gpio)
-   if button_status:
+   if GPIO.input(button_gpio) == GPIO.HIGH:
       button_count += 1
+   if GPIO.input(reset_button_gpio) == GPIO.HIGH:
+      print("Components have restarted")
+      button_count = 0
+      vega.stop_recording()
+      vega.delete_all_data_series()
+      vega.start_recording()
+      set_servo_angles(0)
+      set_led("LED1", "off")
+      set_led("LED2", "off")
+      set_led("LED3", "off")
+      set_fan("off")
+      display.lcd_clear()
+
+
 servo_pwm.set_PWM_dutycycle( servo, 0 )
 servo_pwm.set_PWM_frequency( servo, 0 )
 GPIO.cleanup()

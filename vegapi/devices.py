@@ -20,11 +20,11 @@ class Device(Generic[T]):
     isInput: bool # True if input, False if output
     isConnected: bool # True if connected, False if connected
     value: T
-    hasData: bool # True if data is available, False if not
+    hasRecordedData: bool # True if data is available, False if not
     frequency: Optional[float]
     onCall: Optional[Callable[[Optional[T]], Optional[T]]]
 
-    def __init__(self, name: str, description: str, pins: List[str], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None, isConnected: bool = True, hasData: bool = False, onCall: Optional[Callable[[T], Optional[T]]] = None):
+    def __init__(self, name: str, description: str, pins: List[str], device_type: device_types, isInput: bool, value: T, frequency: Optional[float] = None, isConnected: bool = True, hasRecordedData: bool = False, onCall: Optional[Callable[[T], Optional[T]]] = None):
         self.name = name
         self.description = description
         self.pins = pins
@@ -33,7 +33,7 @@ class Device(Generic[T]):
         self.value = value 
         self.frequency = frequency
         self.isConnected = isConnected
-        self.hasData = hasData
+        self.hasRecordedData = hasRecordedData
         self.onCall = onCall
 
     def run_call(self, value: Optional[T] = None):
@@ -53,7 +53,7 @@ class Device(Generic[T]):
             "isInput": self.isInput,
             "isConnected": self.isConnected,
             "frequency": self.frequency,
-            "hasData": self.hasData
+            "hasRecordedData": self.hasRecordedData
         }
 
 

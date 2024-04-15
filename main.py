@@ -9,32 +9,18 @@ import datetime
 import time
 import psutil
 from tabulate import tabulate
+from vegapi.api import MapTool
 from vegapi.database import DataPlot, DataSeries, PeriodicData
 import time
 import adafruit_dht
 import board
+import serial               #import serial pacakge
+import sys   
+import pigpio
+
 
 GPIO.setwarnings(False) 
 GPIO.setmode(GPIO.BCM) 
-GPIO.cleanup()
-
-def get_temp() -> Optional[float]:
-   try:
-      temperature_c =  dht_device.temperature
-      if temperature_c:
-         return float(temperature_c)
-      return temperature_c
-   except RuntimeError as err:
-      return None
-   
-def get_humidity() -> Optional[float]:
-   try:
-      humidity =  dht_device.humidity
-      if humidity:
-         return float(humidity)
-      return humidity
-   except RuntimeError as err:
-      return None
 
 def find_device(name: str) -> Optional[Device]:
    for device in devices:
@@ -42,13 +28,53 @@ def find_device(name: str) -> Optional[Device]:
          return device
    return None
 
-def led_call(value: bool, pin: int) -> Optional[str]:
+## OUTPUTS
+def set_pin(value: bool, pin: int) -> None:
    if value:
       GPIO.output(pin, GPIO.HIGH)
    else:
       GPIO.output(pin, GPIO.LOW)
-   return None
 
+led1 = Device(name="LED1", description="Yellow LED light", value=False, pins=["17"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, 17))
+GPIO.setup(17, GPIO.OUT, initial=GPIO.LOW) 
+
+led2 = Device(name="LED2", description="Red LED light", value=False, pins=["27"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, 27))
+GPIO.setup(27, GPIO.OUT, initial=GPIO.LOW) 
+
+led3 = Device(name="LED3", description="Blue LED light", value=False, pins=["22"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, 22))
+GPIO.setup(22, GPIO.OUT, initial=GPIO.LOW)
+
+lcd = Device(name="LCD", description="LCD display 16x4 with blue backlit", value="Hello World", pins=["SDA", "SCL"], device_type="i2c", isInput=False)
+display = drivers.Lcd()
+
+## SERVO MOTOR
+servo = Device(name="SRV", description="Servo Motor", value=0.0, pins=["13"], device_type="pwm", isInput=False, onCall=lambda x: 0.0)
+servo_pin = 13
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(servo_pin,GPIO.OUT)
+servo_pwm = pigpio.pi()
+servo_pwm.set_mode(servo, pigpio.OUTPUT)
+servo_pwm.set_PWM_frequency( servo, 50 )
+def SetAngle(angle):
+   pulse_width = (angle / 180.0) * (2500 - 500) + 500
+   servo_pwm.set_servo_pulsewidth(servo, pulse_width)
+   time.sleep(3)  # Adjust this delay as needed
+
+## FAN
+fan = Device(name="FAN", description="On off Fan connected to a 5v relay", value=False, pins=["12"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, 12))
+GPIO.setup(12, GPIO.OUT, initial=GPIO.LOW)
+
+## CAMERA
+camera = Device(name="CAM", description="Raspberry Pi Camera", value="none", pins=["PI-CAM"], device_type="i2c", isInput=False)
+picam2 = Picamera2()
+config = picam2.create_still_configuration()
+picam2.configure(config)
+CLIENT_ID = "d84708345365a2b"
+im = pyimgur.Imgur(CLIENT_ID)
+
+## ULTRASONIC
+GPIO.setup(23, GPIO.OUT)
+GPIO.setup(24, GPIO.IN)
 def ultrasonic_call() -> float:
    # start the pulse to get the sensor to send the ping
    # set trigger pin low for 2 micro seconds
@@ -70,48 +96,76 @@ def ultrasonic_call() -> float:
    pingTravelTime = echoStopTime - echoStartTime
    dist_cm = (pingTravelTime*34444)/2
    return dist_cm
-
-led1 = Device(name="LED1", description="Yellow LED light", value=False, pins=["17"], device_type="digital", isInput=False, onCall=lambda x: led_call(x, 17))
-GPIO.setup(17, GPIO.OUT, initial=GPIO.LOW) 
-
-led2 = Device(name="LED2", description="Red LED light", value=False, pins=["27"], device_type="digital", isInput=False, onCall=lambda x: led_call(x, 27))
-GPIO.setup(27, GPIO.OUT, initial=GPIO.LOW) 
-
-led3 = Device(name="LED3", description="Blue LED light", value=False, pins=["22"], device_type="digital", isInput=False, onCall=lambda x: led_call(x, 22))
-GPIO.setup(22, GPIO.OUT, initial=GPIO.LOW)
-
-lcd = Device(name="LCD", description="LCD display 16x4 with blue backlit", value="Hello World", pins=["SDA", "SCL"], device_type="i2c", isInput=False)
-display = drivers.Lcd()
-
-# set up motor circuit + pins
-motor = Device(name="MTR", description="Motor", value=0.0, pins=["5", "6"], device_type="pwm", isInput=False, onCall=lambda x: 0.0)
-
-# set up buzzer circuit + pins
-buzzer = Device(name="BZR", description="Buzzer", value=0.0, pins=["12"], device_type="pwm", isInput=False, onCall=lambda x: 0.0)
-
-camera = Device(name="CAM", description="Raspberry Pi Camera", value="none", pins=["PI-CAM"], device_type="i2c", isInput=False)
-picam2 = Picamera2()
-config = picam2.create_still_configuration()
-picam2.configure(config)
-CLIENT_ID = "d84708345365a2b"
-im = pyimgur.Imgur(CLIENT_ID)
-
 ultrasonic = Device(name="ULTS", description="Ultrasonic distance sensor in cm", value=0.0, pins=["23", "24"], device_type="analog", isInput=True, onCall=lambda x: ultrasonic_call())
-GPIO.setup(23, GPIO.OUT)
-GPIO.setup(24, GPIO.IN)
 
+## TEMP
 dht_device = adafruit_dht.DHT11(board.D4)
+def get_temp() -> Optional[float]:
+   try:
+      temperature_c =  dht_device.temperature
+      if temperature_c:
+         return float(temperature_c)
+      return temperature_c
+   except RuntimeError as err:
+      return None
 temperature = Device(name="TMP", description="Temperature sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_temp())
 
+## HUMIDITY
+def get_humidity() -> Optional[float]:
+   try:
+      humidity =  dht_device.humidity
+      if humidity:
+         return float(humidity)
+      return humidity
+   except RuntimeError as err:
+      return None
 humidity = Device(name="HDT", description="Humidity sensor part of DHT11", value=0.0, pins=["4"], device_type="analog", isInput=True, onCall=lambda x: get_humidity())
 
-# set up light sensor circuit + pins use LDR + capacitor
-light = Device(name="LGT", description="Light sensor", value=0.0, pins=["18"], device_type="analog", isInput=True, onCall=lambda x: 0.0)
+## BUTTON 
+def get_button() -> bool:
+   pass
+button_gpio = 5
+GPIO.setup(button_gpio, GPIO.IN)
+button_status = False
+button_count = 0
+button = Device(name="BTN", description="Button which toggles states, starting by false and also has a counter for how many times it was clicked", value=False, pins=["5"], device_type="digital", isInput=True, onCall=lambda x: button_status)
 
-# set up infrared sensor circuit + pins
-infrared = Device(name="IR", description="Infrared sensor", value=True, pins=["25"], device_type="digital", isInput=True, onCall=lambda x: True)
+## GPS
+gpgga_info = "$GPGGA,"
+ser = serial.Serial ("/dev/ttyS0")              #Open port with baud rate
+GPGGA_buffer = 0
+NMEA_buff = 0
+lat_in_degrees = 0
+long_in_degrees = 0
+gps = Device(name="GPS", description="GPS module", value="none", pins=["15"], device_type="serial", isInput=False, onCall=lambda x: True)
+def GPS_Info():
+    global NMEA_buff
+    global lat_in_degrees
+    global long_in_degrees
+    nmea_time = []
+    nmea_latitude = []
+    nmea_longitude = []
+    nmea_time = NMEA_buff[0]                    #extract time from GPGGA string
+    nmea_latitude = NMEA_buff[1]                #extract latitude from GPGGA string
+    nmea_longitude = NMEA_buff[3]               #extract longitude from GPGGA string
+    
+    print("NMEA Time: ", nmea_time,'\n')
+    print ("NMEA Latitude:", nmea_latitude,"NMEA Longitude:", nmea_longitude,'\n')
+    
+    lat = float(nmea_latitude)                  #convert string into float for calculation
+    longi = float(nmea_longitude)               #convertr string into float for calculation
+    
+    lat_in_degrees = convert_to_degrees(lat)    #get latitude in degree decimal format
+    long_in_degrees = convert_to_degrees(longi) #get longitude in degree decimal format
+def convert_to_degrees(raw_value):
+    decimal_value = raw_value/100.00
+    degrees = int(decimal_value)
+    mm_mmmm = (decimal_value - int(decimal_value))/0.6
+    position = degrees + mm_mmmm
+    position = "%.4f" %(position)
+    return position
 
-devices: List[Device] = [led1, led2, led3, lcd, camera, ultrasonic, temperature, humidity]
+devices: List[Device] = [led1, led2, led3, lcd,  camera, ultrasonic, temperature, humidity, gps, servo, fan]
 
 def get_devices(names: Optional[list[str]] = None) -> list[Device]:
    for device in devices:
@@ -139,14 +193,14 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
             url = capture_image()
             toolCall = ToolResult(name=tool.name, result="Image has been captured and uploaded", ui="image", data=url)
             results.append(toolCall)
-         elif tool.name == "get_stats":
-            stats = get_stats()
+         elif tool.name == "get_raspberry_stats":
+            stats = get_raspberry_stats()
             toolCall = ToolResult(name=tool.name, result="Extracted the CPU, RAM, disk and uptime", ui="table", data=stats)
             results.append(toolCall)
-         elif tool.name == "get_sensor_data":
+         elif tool.name == "get_recorded_data":
             sensorNames = argJson["sensorNames"]
             interval = argJson["interval"]
-            data: DataPlot = get_sensor_data(sensorNames, interval)
+            data: DataPlot = get_recorded_data(sensorNames, interval)
             print(data.to_json())
             toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the plot is shown above", ui="plot", data=data.to_json())
             results.append(toolCall)
@@ -155,6 +209,20 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
             devices: List[Device] = get_devices(deviceNames)
             arrayString = [device.to_json() for device in devices]
             toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the connect devices will be shown above", ui="cards", data=arrayString)
+            results.append(toolCall)
+         elif tool.name == "get_location":
+            location = get_location()
+            toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the location will be shown above", ui="map", data=location.to_json())
+            results.append(toolCall)
+         elif tool.name == "set_servo_angles":
+            angles = argJson["angles"]
+            output = set_servo_angles(angles)
+            toolCall = ToolResult(name=tool.name, result="Servo has been set to the given angles", data=output)
+            results.append(toolCall)
+         elif tool.name == "set_fan":
+            value = argJson["value"]
+            set_fan(value)
+            toolCall = ToolResult(name=tool.name, result="Fan is now " + value)
             results.append(toolCall)
       return results
    return [
@@ -189,13 +257,25 @@ def set_led(name: str, value: str) -> int:
       return 1
 
 @vega.add_tool(
-   description="Gets sensor data and shows it to the user", 
+    description="Sets the fan on or off. ", 
+    parameter_description={
+      "value": "True for on, False for off."
+   }
+)
+def set_fan(value: str):
+   boolVal = value.lower() == "true" or value == "1" or value == "on"
+   fan.run_call(boolVal)
+   fan.value = boolVal
+
+
+@vega.add_tool(
+   description="Gets recorded data of sensor over a period of time", 
    parameter_description={
       "sensorNames": "List of sensors to get the data of given in comma seperated format, for example it can be 'SENSOR1, SENSOR2' it is optional so when not given it will fetch all the devices",
       "interval": "Interval in seconds to get the data, for example last 300 seconds"
    }
 )
-def get_sensor_data(sensorNames: str, interval: str) -> DataPlot:
+def get_recorded_data(sensorNames: str, interval: str) -> DataPlot:
    seconds = int(interval)
    if "," in sensorNames:
       sensorNamesArray = sensorNames.split(",")
@@ -225,11 +305,10 @@ def get_sensor_data(sensorNames: str, interval: str) -> DataPlot:
       plot = DataPlot(title="All Sensors", x_label="Time (s)", y_label="Values", data=data)
       return plot
 
-
 @vega.add_tool(
    description="Gets the information of the raspberry pi such as RAM, CPU, etc.", 
 )
-def get_stats() -> str:
+def get_raspberry_stats() -> str:
    # Collect data
    cpu_temp = 'N/A'
    try:
@@ -255,7 +334,6 @@ def get_stats() -> str:
    ]
    markdown_table = tabulate(table_data, headers=['Metric', 'Value'], tablefmt='pipe')
    return markdown_table
-
 
 @vega.add_tool(
    description="Prints the text on the LCD screen", 
@@ -283,9 +361,9 @@ def capture_image() -> str:
    return uploaded_image.link
 
 @vega.add_tool(
-   description="Gets the list of all connected device and their informatiom",
+   description="Gets the list of connected devices using deviceNames and their information, this is also used to fetch data from certain devices",
    parameter_description={
-      "deviceNames": "List of devices to get the information of given in comma seperated format, for example it can be 'LED1, LED2' it is optional so when not given it will fetch all the devices"
+      "deviceNames": "List of devices to get the information of or fetch data from, given in comma seperated format, for example it can be 'TMP, LED2' (this is optional so when not given it will fetch all the devices)"
    }
 )
 def get_devices(deviceNames: str) -> List[Device]:
@@ -311,11 +389,46 @@ def get_devices(deviceNames: str) -> List[Device]:
             device.run_call(None)
       return devices
 
+@vega.add_tool(
+   description="Gets location using longitude and latitude from GPS module",
+)
+def get_location() -> MapTool:
+   received_data = (str)(ser.readline())                   #read NMEA string received
+   GPGGA_data_available = received_data.find(gpgga_info)   #check for NMEA GPGGA string 
+   if (GPGGA_data_available>0):
+      GPGGA_buffer = received_data.split("$GPGGA,",1)[1]  #store data coming after "$GPGGA," string 
+      NMEA_buff = (GPGGA_buffer.split(','))               #store comma separated data in buffer
+      GPS_Info()                                          #get time, latitude, longitude]
+      gps.value = "Latitude: " + lat_in_degrees + " Longitude: " + long_in_degrees
+      return MapTool(longitude=long_in_degrees, latitude=lat_in_degrees)
+   gps.value = "Latitude: " + lat_in_degrees + " Longitude: " + long_in_degrees
+   return MapTool(longitude=-1.5547755416554814, latitude=53.809666674924046)
+
+@vega.add_tool(
+   description="Sets the servo to a given set of angles between 0 and 180",
+   parameter_description={
+      "angles": "List of angles to set the servo, given in comma seperated format, for example it can be '0, 180, 0' which will set the servo to be 0 at first, then at 180 then 0 again with each angle being set for 1 second."
+   }
+)
+def set_servo_angles(angles: str) -> str:
+   if "," in angles:
+      angles = angles.split(",")
+      for angle in angles:
+         SetAngle(int(angle))
+      return "Success"
+   return "No angle given"
+
 vega.run()
 vega.delete_all_data_series()
 vega.start_recording()
 
 print(tools_to_json(vega.tools))
 
-while True:
-   pass
+status = True
+while status:
+   button_status = GPIO.input(button_gpio)
+   if button_status:
+      button_count += 1
+servo_pwm.set_PWM_dutycycle( servo, 0 )
+servo_pwm.set_PWM_frequency( servo, 0 )
+GPIO.cleanup()

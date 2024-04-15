@@ -23,16 +23,29 @@ class RunTool:
             "arguments": self.arguments
         }
 
+class MapTool:
+    longitude: str;
+    latitude: str;
+    def __init__(self, longitude: str, latitude: str):
+        self.longitude = longitude
+        self.latitude = latitude
+    
+    def to_json(self):
+        return {
+            "longitude": self.longitude,
+            "latitude": self.latitude
+        }
+
 UiType = Literal["flow-chart" , "plot" , "cards" , "image", "table", "map"]
 
 class ToolResult:
     name: str
     result: str
     error: Optional[str]
-    data: Optional[Union[DataPlot, str, Device]]
+    data: Optional[Union[DataPlot, str, Device, MapTool]]
     ui: Optional[UiType]
 
-    def __init__(self, name: str, result: str, error: Optional[str] = None, data: Optional[Union[DataPlot, str, Device]] = None, ui: Optional[UiType] = None):
+    def __init__(self, name: str, result: str, error: Optional[str] = None, data: Optional[Union[DataPlot, str, Device, MapTool]] = None, ui: Optional[UiType] = None):
         self.name = name
         self.result = result
         self.error = error

@@ -5,7 +5,8 @@ device_types = Literal[
     "pwm",
     "digital",
     "analog",
-    "i2c"
+    "i2c",
+    "serial"
 ];
 
 # Define a generic type variable

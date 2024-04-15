@@ -1,28 +1,27 @@
-import Adafruit_CharLCD as LCD
+#! /usr/bin/env python
+
+# Simple clock program. Writes the exact time.
+# Demo program for the I2C 16x2 Display from Ryanteck.uk
+# Created by Matthew Timmons-Brown for The Raspberry Pi Guy YouTube channel
+
+# Import necessary libraries for communication and display use
+import drivers
 from time import sleep
+from datetime import datetime
 
-# Define LCD pin numbers
-LCD_RS = 25
-LCD_EN = 24
-LCD_D4 = 23
-LCD_D5 = 17
-LCD_D6 = 18
-LCD_D7 = 22
-LCD_COLUMNS = 16
-LCD_ROWS = 2
-
-# Create LCD object
-lcd = LCD.Adafruit_CharLCD(
-    LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7,
-    LCD_COLUMNS, LCD_ROWS
-)
+# Load the driver and set it to "display"
+# If you use something from the driver library use the "display." prefix first
+display = drivers.Lcd()
 
 try:
+    print("Writing to display")
+    display.lcd_display_string("i love u sidra<3", 1)  # Write line of text to first line of display
     while True:
-        lcd.clear()
-        lcd.message("Hello, World!\nI2C LCD on RPi")
-        sleep(2)
+        # Write just the time to the display
+        display.lcd_display_string(str(datetime.now().time()), 2)
+        # Uncomment the following line to loop with 1 sec delay
+        # sleep(1)
 except KeyboardInterrupt:
-    pass
-finally:
-    lcd.clear()
+    # If there is a KeyboardInterrupt (when you press ctrl+c), exit the program and cleanup
+    print("Cleaning up!")
+    display.lcd_clear()

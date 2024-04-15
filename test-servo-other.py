@@ -1,7 +1,10 @@
 #!/usr/bin/python3
 import pigpio
 import time
+import RPi.GPIO as GPIO
 
+GPIO.setwarnings(False) 
+GPIO.setmode(GPIO.BCM) 
 servo = 13
 
 # more info at http://abyz.me.uk/rpi/pigpio/python.html#set_servo_pulsewidth
@@ -23,7 +26,9 @@ set_angle(45)
 set_angle(90)
 set_angle(135)
 set_angle(180)
+set_angle(0)
 
 # turning off servo
 pwm.set_PWM_dutycycle( servo, 0 )
 pwm.set_PWM_frequency( servo, 0 )
+pwm.stop()

@@ -1,3 +1,6 @@
+#!/usr/bin/python3
+import pigpio
+
 from typing import List, Optional
 from vegapi import Vega, Device, RunTool, SinglePlot , ToolResult, tools_to_json 
 import RPi.GPIO as GPIO
@@ -15,10 +18,9 @@ import time
 import adafruit_dht
 import board
 import serial               #import serial pacakge
-import sys   
-import pigpio
 from typing import Dict
 
+from vegapi.devices import devices_to_json
 
 GPIO.setwarnings(False) 
 GPIO.setmode(GPIO.BCM) 
@@ -36,34 +38,39 @@ def set_pin(value: bool, pin: int) -> None:
    else:
       GPIO.output(pin, GPIO.LOW)
 
+## SERVO MOTOR
+servo = Device(name="SRV", description="Servo Motor", value=0.0, pins=["13"], device_type="pwm", isInput=False, onCall=lambda x: current_angle)
+servo_pin = 13
+servo_pwm = pigpio.pi()
+servo_pwm.set_mode(servo_pin, pigpio.OUTPUT)
+servo_pwm.set_PWM_frequency( servo_pin, 50 )
+current_angle = 0
+def SetAngle(angle):
+   global current_angle 
+   current_angle = angle
+   pulse_width = (angle / 180.0) * (2500 - 500) + 500
+   servo_pwm.set_servo_pulsewidth(servo_pin, pulse_width)
+   time.sleep(2)  # Adjust this delay as needed
+
 led1 = Device(name="LED1", description="Yellow LED light", value=False, pins=["17"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, 17))
-GPIO.setup(17, GPIO.OUT, initial=GPIO.LOW) 
+led1_pin = 17
+GPIO.setup(led1_pin, GPIO.OUT, initial=GPIO.LOW) 
 
 led2 = Device(name="LED2", description="Red LED light", value=False, pins=["27"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, 27))
-GPIO.setup(27, GPIO.OUT, initial=GPIO.LOW) 
+led2_pin = 27
+GPIO.setup(led2_pin, GPIO.OUT, initial=GPIO.LOW) 
 
 led3 = Device(name="LED3", description="Blue LED light", value=False, pins=["22"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, 22))
-GPIO.setup(22, GPIO.OUT, initial=GPIO.LOW)
+led3_pin = 22
+GPIO.setup(led3_pin, GPIO.OUT, initial=GPIO.LOW)
 
 lcd = Device(name="LCD", description="LCD display 16x4 with blue backlit", value="Hello World", pins=["SDA", "SCL"], device_type="i2c", isInput=False)
 display = drivers.Lcd()
 
-## SERVO MOTOR
-servo = Device(name="SRV", description="Servo Motor", value=0.0, pins=["13"], device_type="pwm", isInput=False, onCall=lambda x: 0.0)
-servo_pin = 13
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(servo_pin,GPIO.OUT)
-servo_pwm = pigpio.pi()
-servo_pwm.set_mode(servo, pigpio.OUTPUT)
-servo_pwm.set_PWM_frequency( servo, 50 )
-def SetAngle(angle):
-   pulse_width = (angle / 180.0) * (2500 - 500) + 500
-   servo_pwm.set_servo_pulsewidth(servo, pulse_width)
-   time.sleep(3)  # Adjust this delay as needed
-
 ## FAN
-fan = Device(name="FAN", description="On off Fan connected to a 5v relay", value=False, pins=["12"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, 12))
-GPIO.setup(12, GPIO.OUT, initial=GPIO.LOW)
+fan_pin = 26
+GPIO.setup(fan_pin, GPIO.OUT, initial=GPIO.LOW)
+fan = Device(name="FAN", description="On off Fan connected to a 5v relay", value=False, pins=["26"], device_type="digital", isInput=False, onCall=lambda x: set_pin(x, fan_pin))
 
 ## CAMERA
 camera = Device(name="CAM", description="Raspberry Pi Camera", value="none", pins=["PI-CAM"], device_type="i2c", isInput=True)
@@ -141,24 +148,24 @@ NMEA_buff = 0
 lat_in_degrees = 0
 long_in_degrees = 0
 def GPS_Info():
-    global NMEA_buff
-    global lat_in_degrees
-    global long_in_degrees
-    nmea_time = []
-    nmea_latitude = []
-    nmea_longitude = []
-    nmea_time = NMEA_buff[0]                    #extract time from GPGGA string
-    nmea_latitude = NMEA_buff[1]                #extract latitude from GPGGA string
-    nmea_longitude = NMEA_buff[3]               #extract longitude from GPGGA string
-    
-    print("NMEA Time: ", nmea_time,'\n')
-    print ("NMEA Latitude:", nmea_latitude,"NMEA Longitude:", nmea_longitude,'\n')
-    
-    lat = float(nmea_latitude)                  #convert string into float for calculation
-    longi = float(nmea_longitude)               #convertr string into float for calculation
-    
-    lat_in_degrees = convert_to_degrees(lat)    #get latitude in degree decimal format
-    long_in_degrees = convert_to_degrees(longi) #get longitude in degree decimal format
+   global NMEA_buff
+   global lat_in_degrees
+   global long_in_degrees
+   nmea_time = []
+   nmea_latitude = []
+   nmea_longitude = []
+   nmea_time = NMEA_buff[0]                    #extract time from GPGGA string
+   nmea_latitude = NMEA_buff[1]                #extract latitude from GPGGA string
+   nmea_longitude = NMEA_buff[3]               #extract longitude from GPGGA string
+
+   print("NMEA Time: ", nmea_time,'\n')
+   print ("NMEA Latitude:", nmea_latitude,"NMEA Longitude:", nmea_longitude,'\n')
+
+   lat = float(nmea_latitude)                  #convert string into float for calculation
+   longi = float(nmea_longitude)               #convertr string into float for calculation
+
+   lat_in_degrees = convert_to_degrees(lat)    #get latitude in degree decimal format
+   long_in_degrees = convert_to_degrees(longi) #get longitude in degree decimal format
 def convert_to_degrees(raw_value):
    decimal_value = raw_value/100.00
    degrees = int(decimal_value)
@@ -181,6 +188,7 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
    if tools:
       results = []
       for tool in tools:
+         print(tool.to_json())
          argJson = json.loads(tool.arguments)
          if tool.name == "set_led":
             ledName =  argJson["name"]
@@ -441,7 +449,11 @@ vega.run()
 vega.delete_all_data_series()
 vega.start_recording()
 
-print(tools_to_json(vega.tools))
+with open("tools.json", "w") as text_file:
+   text_file.write(tools_to_json(vega.tools))
+
+with open("devices.json", "w") as text_file:
+   text_file.write(devices_to_json(devices))
 
 status = True
 reset_button_gpio = 5
@@ -452,17 +464,17 @@ while status:
    if GPIO.input(reset_button_gpio) == GPIO.HIGH:
       print("Components have restarted")
       button_count = 0
-      vega.stop_recording()
       vega.delete_all_data_series()
-      vega.start_recording()
-      set_servo_angles(0)
-      set_led("LED1", "off")
-      set_led("LED2", "off")
-      set_led("LED3", "off")
-      set_fan("off")
+      SetAngle(0)
+      set_pin(False, led1_pin)
+      set_pin(False, led2_pin)
+      set_pin(False, led3_pin)
+      set_pin(False, fan_pin)
       display.lcd_clear()
+   time.sleep(0.1)
 
 
 servo_pwm.set_PWM_dutycycle( servo, 0 )
 servo_pwm.set_PWM_frequency( servo, 0 )
+servo_pwm.stop()
 GPIO.cleanup()

@@ -1,0 +1,147 @@
+[
+    {
+        "name": "LED1",
+        "description": "Yellow LED light",
+        "value": false,
+        "type": "digital",
+        "pins": [
+            "17"
+        ],
+        "isInput": false,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "LED2",
+        "description": "Red LED light",
+        "value": false,
+        "type": "digital",
+        "pins": [
+            "27"
+        ],
+        "isInput": false,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "LED3",
+        "description": "Blue LED light",
+        "value": false,
+        "type": "digital",
+        "pins": [
+            "22"
+        ],
+        "isInput": false,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "LCD",
+        "description": "LCD display 16x4 with blue backlit",
+        "value": "Hello World",
+        "type": "i2c",
+        "pins": [
+            "SDA",
+            "SCL"
+        ],
+        "isInput": false,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "CAM",
+        "description": "Raspberry Pi Camera",
+        "value": "none",
+        "type": "i2c",
+        "pins": [
+            "PI-CAM"
+        ],
+        "isInput": true,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "ULTS",
+        "description": "Ultrasonic distance sensor in cm",
+        "value": 0.0,
+        "type": "analog",
+        "pins": [
+            "23",
+            "24"
+        ],
+        "isInput": true,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": true
+    },
+    {
+        "name": "TMP",
+        "description": "Temperature sensor part of DHT11",
+        "value": 0.0,
+        "type": "analog",
+        "pins": [
+            "4"
+        ],
+        "isInput": true,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": true
+    },
+    {
+        "name": "HDT",
+        "description": "Humidity sensor part of DHT11",
+        "value": 0.0,
+        "type": "analog",
+        "pins": [
+            "4"
+        ],
+        "isInput": true,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": true
+    },
+    {
+        "name": "GPS",
+        "description": "GPS module",
+        "value": "none",
+        "type": "serial",
+        "pins": [
+            "15"
+        ],
+        "isInput": true,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "SRV",
+        "description": "Servo Motor",
+        "value": 0.0,
+        "type": "pwm",
+        "pins": [
+            "13"
+        ],
+        "isInput": false,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "FAN",
+        "description": "On off Fan connected to a 5v relay",
+        "value": false,
+        "type": "digital",
+        "pins": [
+            "26"
+        ],
+        "isInput": false,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    }
+]

@@ -112,7 +112,7 @@ class VegaApi:
             json_data = req.get_json(force=True, silent=True)
             if json_data:
                 run_tools = [RunTool(tool['name'], tool['arguments']) for tool in json_data]
-                print(run_tools)
+               
                 results = self.onRunTools(run_tools)
                 if isinstance(results, Response):
                     return results

@@ -1,0 +1,126 @@
+[
+    {
+        "name": "set_led",
+        "description": "Sets the LED name on or off. ",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "name of the LED ex: LED1",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "True for on, False for off.",
+                    "type": "string"
+                }
+            },
+            "return": "int",
+            "required": [
+                "name",
+                "value"
+            ]
+        }
+    },
+    {
+        "name": "set_fan",
+        "description": "Sets the fan on or off. ",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "description": "True for on, False for off.",
+                    "type": "string"
+                }
+            },
+            "return": "_empty",
+            "required": [
+                "value"
+            ]
+        }
+    },
+    {
+        "name": "get_recorded__sensor_data",
+        "description": "Gets recorded data of sensor over a period of time",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sensorNames": {
+                    "description": "List of sensors to get the data of given in comma seperated format, for example it can be 'SENSOR1, SENSOR2' it is optional so when not given it will fetch all the devices",
+                    "type": "string"
+                },
+                "interval": {
+                    "description": "Interval in seconds to get the data, for example last 300 seconds",
+                    "type": "string"
+                }
+            },
+            "return": "DataPlot",
+            "required": [
+                "sensorNames",
+                "interval"
+            ]
+        }
+    },
+    {
+        "name": "get_raspberry_stats",
+        "description": "Gets the information of the raspberry pi such as RAM, CPU, etc."
+    },
+    {
+        "name": "print_lcd",
+        "description": "Prints the text on the LCD screen",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "description": "Text to print on the LCD screen, you can add formatting in the string which will get filled with values of components, for example 'Temperature: {TMP}'",
+                    "type": "string"
+                }
+            },
+            "return": "_empty",
+            "required": [
+                "text"
+            ]
+        }
+    },
+    {
+        "name": "capture_image",
+        "description": "Captures an image from the raspberry pi camera and returns the URL"
+    },
+    {
+        "name": "get_connected_devices",
+        "description": "Gets the list of connected devices using deviceNames and their information, this is also used to fetch data from certain devices",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "deviceNames": {
+                    "description": "List of devices to get the information of or fetch data from, given in comma seperated format, for example it can be 'TMP, LED2' (this is optional so when not given it will fetch all the devices)",
+                    "type": "string"
+                }
+            },
+            "return": "List",
+            "required": [
+                "deviceNames"
+            ]
+        }
+    },
+    {
+        "name": "get_location",
+        "description": "Gets location using longitude and latitude from GPS module"
+    },
+    {
+        "name": "set_servo_angles",
+        "description": "Sets the servo to a given set of angles between 0 and 180",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "angles": {
+                    "description": "List of angles to set the servo, given in comma seperated format, for example it can be '0, 180, 0' which will set the servo to be 0 at first, then at 180 then 0 again with each angle being set for 1 second.",
+                    "type": "string"
+                }
+            },
+            "return": "str",
+            "required": [
+                "angles"
+            ]
+        }
+    }
+]

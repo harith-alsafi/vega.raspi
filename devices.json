@@ -2,7 +2,7 @@
     {
         "name": "LED1",
         "description": "Yellow LED light",
-        "value": false,
+        "value": "False",
         "type": "digital",
         "pins": [
             "17"
@@ -15,7 +15,7 @@
     {
         "name": "LED2",
         "description": "Red LED light",
-        "value": false,
+        "value": "False",
         "type": "digital",
         "pins": [
             "27"
@@ -28,7 +28,7 @@
     {
         "name": "LED3",
         "description": "Blue LED light",
-        "value": false,
+        "value": "False",
         "type": "digital",
         "pins": [
             "22"
@@ -41,7 +41,7 @@
     {
         "name": "LCD",
         "description": "LCD display 16x4 with blue backlit",
-        "value": "Hello World",
+        "value": "none",
         "type": "i2c",
         "pins": [
             "SDA",
@@ -68,7 +68,7 @@
     {
         "name": "ULTS",
         "description": "Ultrasonic distance sensor in cm",
-        "value": 0.0,
+        "value": "0.0",
         "type": "analog",
         "pins": [
             "23",
@@ -82,7 +82,7 @@
     {
         "name": "TMP",
         "description": "Temperature sensor part of DHT11",
-        "value": 0.0,
+        "value": "0.0",
         "type": "analog",
         "pins": [
             "4"
@@ -95,7 +95,7 @@
     {
         "name": "HDT",
         "description": "Humidity sensor part of DHT11",
-        "value": 0.0,
+        "value": "0.0",
         "type": "analog",
         "pins": [
             "4"
@@ -121,7 +121,7 @@
     {
         "name": "SRV",
         "description": "Servo Motor",
-        "value": 0.0,
+        "value": "0.0",
         "type": "pwm",
         "pins": [
             "13"
@@ -134,12 +134,38 @@
     {
         "name": "FAN",
         "description": "On off Fan connected to a 5v relay",
-        "value": false,
+        "value": "False",
         "type": "digital",
         "pins": [
             "26"
         ],
         "isInput": false,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "SWT",
+        "description": "Switch which can be on or off",
+        "value": "0",
+        "type": "digital",
+        "pins": [
+            "19"
+        ],
+        "isInput": true,
+        "isConnected": true,
+        "frequency": null,
+        "hasRecordedData": false
+    },
+    {
+        "name": "BTN",
+        "description": "Button which has a variable counter for how many times it was clicked",
+        "value": "0",
+        "type": "digital",
+        "pins": [
+            "21"
+        ],
+        "isInput": true,
         "isConnected": true,
         "frequency": null,
         "hasRecordedData": false

@@ -64,7 +64,7 @@ led3 = Device(name="LED3", description="Blue LED light", value=False, pins=["22"
 led3_pin = 22
 GPIO.setup(led3_pin, GPIO.OUT, initial=GPIO.LOW)
 
-lcd = Device(name="LCD", description="LCD display 16x4 with blue backlit", value="Hello World", pins=["SDA", "SCL"], device_type="i2c", isInput=False)
+lcd = Device(name="LCD", description="LCD display 16x4 with blue backlit", value="none", pins=["SDA", "SCL"], device_type="i2c", isInput=False)
 display = drivers.Lcd()
 
 ## FAN
@@ -138,7 +138,8 @@ button = Device(name="BTN", description="Button which has a variable counter for
 # switch 
 switch_gpio = 19
 GPIO.setup(switch_gpio, GPIO.IN)
-switch = Device(name="SWT", description="Switch which can be on or off", value=0, pins=["19"], device_type="digital", isInput=True, onCall=lambda x: int(GPIO.input(switch_gpio) == GPIO.HIGH))
+switch_value = 0
+switch = Device(name="SWT", description="Switch which can be on or off", value=0, pins=["19"], device_type="digital", isInput=True, onCall=lambda x: switch_value)
 
 ## GPS
 gpgga_info = "$GPGGA,"
@@ -147,6 +148,10 @@ GPGGA_buffer = 0
 NMEA_buff = 0
 lat_in_degrees = 0
 long_in_degrees = 0
+lat_elec = 53.809666674924046
+long_elec = -1.5547755416554814
+lat_london = 51.527523151417206
+long_london =  -0.08827792567501526
 def GPS_Info():
    global NMEA_buff
    global lat_in_degrees
@@ -176,7 +181,7 @@ def convert_to_degrees(raw_value):
 
 gps = Device(name="GPS", description="GPS module", value="none", pins=["15"], device_type="serial", isInput=True, onCall=lambda x: get_location())
 
-devices: List[Device] = [led1, led2, led3, lcd,  camera, ultrasonic, temperature, humidity, gps, servo, fan]
+devices: List[Device] = [led1, led2, led3, lcd,  camera, ultrasonic, temperature, humidity, gps, servo, fan, switch, button]
 
 def get_devices(names: Optional[list[str]] = None) -> list[Device]:
    for device in devices:
@@ -213,18 +218,18 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
             sensorNames = argJson["sensorNames"]
             interval = argJson["interval"]
             data: DataPlot = get_recorded__sensor_data(sensorNames, interval)
-            print(data.to_json())
             toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the plot is shown above", ui="plot", data=data.to_json())
             results.append(toolCall)
          elif tool.name == "get_connected_devices":
             deviceNames = argJson["deviceNames"]
             devices: List[Device] = get_connected_devices(deviceNames)
             arrayString = [device.to_json() for device in devices]
-            toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the connect devices will be shown above", ui="cards", data=arrayString)
+            values = json.dumps([device.to_llm_output() for device in devices])
+            toolCall = ToolResult(name=tool.name, result="Here are the fetced devices: "+values+" this will be shown to the user in the UI above", ui="cards", data=arrayString)
             results.append(toolCall)
          elif tool.name == "get_location":
             location = get_location()
-            toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the location will be shown above", ui="map", data=location.to_json())
+            toolCall = ToolResult(name=tool.name, result="Extracted the coordinates from the connected GPS the module, inform the user it will be shown above", ui="map", data=location.to_json())
             results.append(toolCall)
          elif tool.name == "set_servo_angles":
             angles = argJson["angles"]
@@ -414,16 +419,21 @@ def get_connected_devices(deviceNames: str) -> List[Device]:
    description="Gets location using longitude and latitude from GPS module",
 )
 def get_location() -> MapTool:
-   received_data = (str)(ser.readline())                   #read NMEA string received
-   GPGGA_data_available = received_data.find(gpgga_info)   #check for NMEA GPGGA string 
-   if (GPGGA_data_available>0):
-      GPGGA_buffer = received_data.split("$GPGGA,",1)[1]  #store data coming after "$GPGGA," string 
-      NMEA_buff = (GPGGA_buffer.split(','))               #store comma separated data in buffer
-      GPS_Info()                                          #get time, latitude, longitude]
-      gps.value = "Latitude: " + lat_in_degrees + " Longitude: " + long_in_degrees
-      return MapTool(longitude=long_in_degrees, latitude=lat_in_degrees)
-   gps.value = "Latitude: " + lat_in_degrees + " Longitude: " + long_in_degrees
-   return MapTool(longitude=-1.5547755416554814, latitude=53.809666674924046)
+   global long_in_degrees
+   global lat_in_degrees
+   try:
+      received_data = (str)(ser.readline())                   #read NMEA string received
+      GPGGA_data_available = received_data.find(gpgga_info)   #check for NMEA GPGGA string 
+      if (GPGGA_data_available>0):
+         GPGGA_buffer = received_data.split("$GPGGA,",1)[1]  #store data coming after "$GPGGA," string 
+         NMEA_buff = (GPGGA_buffer.split(','))               #store comma separated data in buffer
+         GPS_Info()                                          #get time, latitude, longitude]
+   except Exception as e:
+      print("Error: ", e)
+      long_in_degrees = long_london
+      lat_in_degrees = lat_london
+   gps.value = "Latitude: " + str(lat_in_degrees) + " Longitude: " + str(long_in_degrees)
+   return MapTool(longitude=long_in_degrees, latitude=lat_in_degrees)
 
 @vega.add_tool(
    description="Sets the servo to a given set of angles between 0 and 180",
@@ -437,6 +447,8 @@ def set_servo_angles(angles: str) -> str:
       for angle in angles:
          SetAngle(int(angle))
       return "Success"
+   else:
+      SetAngle(int(angles))
    return "No angle given"
 
 def test_output_circuit():
@@ -458,19 +470,56 @@ with open("devices.json", "w") as text_file:
 status = True
 reset_button_gpio = 5
 GPIO.setup(reset_button_gpio, GPIO.IN)
+
+def reset_components():
+   print("Components have restarted")
+   global button_count
+   button_count = 0
+   vega.delete_all_data_series()
+   SetAngle(0)
+   set_pin(False, led1_pin)
+   set_pin(False, led2_pin)
+   set_pin(False, led3_pin)
+   set_pin(False, fan_pin)
+   display.lcd_clear()
+
+def test_componets():
+   print("Testing Servo")
+   SetAngle(60)
+   print("Testing LEDs")
+   set_pin(True, led1_pin)
+   set_pin(True, led2_pin)
+   set_pin(True, led3_pin)
+   print("Testing Fan")
+   set_pin(True, fan_pin)
+   print("Testing LCD")
+   print_lcd("Hello World")
+   print("Testing Camera")
+   print(capture_image())
+   print("Testing Ultrasonic")
+   print(ultrasonic_call())
+   print("Testing Temperature")
+   print(get_temp())
+   print("Testing Humidity")
+   print(get_humidity())
+   print("Testing GPS")
+   print(get_location().to_json())
+   print("Press limit switch")
+   while GPIO.input(button_gpio) == GPIO.LOW:
+      time.sleep(0.1)
+      
 while status:
+   switch_value = int(GPIO.input(switch_gpio) == GPIO.HIGH)
+   reset_button_value = int(GPIO.input(reset_button_gpio) == GPIO.HIGH)
    if GPIO.input(button_gpio) == GPIO.HIGH:
       button_count += 1
-   if GPIO.input(reset_button_gpio) == GPIO.HIGH:
-      print("Components have restarted")
-      button_count = 0
-      vega.delete_all_data_series()
-      SetAngle(0)
-      set_pin(False, led1_pin)
-      set_pin(False, led2_pin)
-      set_pin(False, led3_pin)
-      set_pin(False, fan_pin)
-      display.lcd_clear()
+   if switch_value == 0 and reset_button_value == 1:
+      reset_components()
+   if switch_value == 1 and reset_button_value == 1:
+      test_componets()
+      time.sleep(3)
+      reset_components()
+   
    time.sleep(0.1)
 
 

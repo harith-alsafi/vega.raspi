@@ -47,13 +47,19 @@ class Device(Generic[T]):
         return {
             "name": self.name,
             "description": self.description,
-            "value": self.value,
+            "value": str(self.value),
             "type": self.device_type,
             "pins": self.pins,
             "isInput": self.isInput,
             "isConnected": self.isConnected,
             "frequency": self.frequency,
             "hasRecordedData": self.hasRecordedData
+        }
+    
+    def to_llm_output(self):
+        return {
+            "name": self.name,
+            "value": str(self.value)
         }
 
 

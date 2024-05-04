@@ -78,9 +78,11 @@ class VegaApi:
     onRunTools: Callable[[list[RunTool]], RunToolsReturnType]
     # takes list of component names 
     onGetDevices: Callable[[Optional[list[str]]], GetDevicesReturnType] 
+    onReset: Callable
 
     # event emitter here for tool call run 
-    def __init__(self, onGetTools: Callable[[Optional[str]], GetToolsReturnType], onRunTools: Callable[[list[RunTool]], RunToolsReturnType], onGetDevices: Callable[[Optional[list[str]]], GetDevicesReturnType]):
+    def __init__(self, onGetTools: Callable[[Optional[str]], GetToolsReturnType], onRunTools: Callable[[list[RunTool]], RunToolsReturnType], onGetDevices: Callable[[Optional[list[str]]], GetDevicesReturnType], onReset: Callable):
+        self.onReset = onReset
         self.app = Flask(__name__)
         CORS(self.app) 
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")
@@ -141,6 +143,10 @@ class VegaApi:
             json_devices = devices_to_json(devices=devices)
             return Response(json_devices, content_type='application/json')
 
+    def reset_devices(self):
+        self.onReset()
+        return Response("Devices reset", content_type='application/json')
+
     def setup_routes(self):
         @self.app.route('/')
         def index():
@@ -157,6 +163,10 @@ class VegaApi:
         @self.app.route('/get-devices', methods=['GET', 'POST'])
         def get_devices():
             return self.get_devices(request)
+        
+        @self.app.route('/reset-devices', methods=['GET', 'POST'])
+        def reset_devices():
+            return self.reset_devices()
 
     def run_flask_app(self):
         # 5000 doesnt work on windows but works on raspi 

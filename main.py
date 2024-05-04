@@ -189,6 +189,62 @@ def get_devices(names: Optional[list[str]] = None) -> list[Device]:
          device.run_call(None)
       return devices
 
+def run_all_tool(tools: list[RunTool], isEvaluation: bool) -> list[ToolResult]:
+   if tools:
+      results = []
+      for tool in tools:
+         print(tool.to_json())
+         argJson = json.loads(tool.arguments)
+         if tool.name == "set_led":
+            ledName =  argJson["name"]
+            value = argJson["value"]
+            set_led(ledName, value)
+            toolCall = ToolResult(name=tool.name, result="LED is now " + value)
+            results.append(toolCall)
+         elif tool.name == "print_lcd":
+            text = argJson["text"]
+            print_lcd(text)
+            toolCall = ToolResult(name=tool.name, result="LCD is now " + text)
+            results.append(toolCall)
+         elif tool.name == "capture_image":
+            url = capture_image()
+            toolCall = ToolResult(name=tool.name, result="ONLY inform the user that the image is successfully captured", ui="image", data=url)
+            results.append(toolCall)
+         elif tool.name == "get_raspberry_stats":
+            stats = get_raspberry_stats()
+            toolCall = ToolResult(name=tool.name, result="Inform the user that the CPU, RAM, disk and uptime has been extracted, DON'T mention any values", ui="table", data=stats)
+            results.append(toolCall)
+         elif tool.name == "get_recorded__sensor_data":
+            sensorNames = argJson["sensorNames"]
+            interval = argJson["interval"]
+            data: DataPlot = get_recorded__sensor_data(sensorNames, interval)
+            toolCall = ToolResult(name=tool.name, result="ONLY inform the user that the data and plot is shown and that is it, I repeat do not mention anything else", ui="plot", data=data.to_json())
+            results.append(toolCall)
+         elif tool.name == "get_connected_devices":
+            deviceNames = argJson["deviceNames"]
+            devices: List[Device] = get_connected_devices(deviceNames)
+            arrayString = [device.to_json() for device in devices]
+            values = json.dumps([device.to_llm_output() for device in devices])
+            toolCall = ToolResult(name=tool.name, result="Here are the fetced devices: "+values+" this will be shown to the user in the UI above, so ONLY inform the user that the devices are shown above and thats it!", ui="cards", data=arrayString)
+            results.append(toolCall)
+         elif tool.name == "get_location":
+            location = get_location()
+            toolCall = ToolResult(name=tool.name, result="Extracted the coordinates from the connected GPS the module, inform the user it will be shown above and thats it", ui="map", data=location.to_json())
+            results.append(toolCall)
+         elif tool.name == "set_servo_angles":
+            angles = argJson["angles"]
+            output = set_servo_angles(angles)
+            toolCall = ToolResult(name=tool.name, result="Servo has been set to the given angles", data=output)
+            results.append(toolCall)
+         elif tool.name == "set_fan":
+            value = argJson["value"]
+            set_fan(value)
+            toolCall = ToolResult(name=tool.name, result="Fan is now " + value)
+            results.append(toolCall)
+      return results
+   return []
+
+
 def run_tools(tools: list[RunTool]) -> list[ToolResult]:
    if tools:
       results = []
@@ -208,28 +264,28 @@ def run_tools(tools: list[RunTool]) -> list[ToolResult]:
             results.append(toolCall)
          elif tool.name == "capture_image":
             url = capture_image()
-            toolCall = ToolResult(name=tool.name, result="Image has been captured and uploaded", ui="image", data=url)
+            toolCall = ToolResult(name=tool.name, result="ONLY inform the user that the image is successfully captured", ui="image", data=url)
             results.append(toolCall)
          elif tool.name == "get_raspberry_stats":
             stats = get_raspberry_stats()
-            toolCall = ToolResult(name=tool.name, result="Extracted the CPU, RAM, disk and uptime", ui="table", data=stats)
+            toolCall = ToolResult(name=tool.name, result="Inform the user that the CPU, RAM, disk and uptime has been extracted, DON'T mention any values", ui="table", data=stats)
             results.append(toolCall)
          elif tool.name == "get_recorded__sensor_data":
             sensorNames = argJson["sensorNames"]
             interval = argJson["interval"]
             data: DataPlot = get_recorded__sensor_data(sensorNames, interval)
-            toolCall = ToolResult(name=tool.name, result="ONLY Inform the user that the plot is shown above", ui="plot", data=data.to_json())
+            toolCall = ToolResult(name=tool.name, result="ONLY inform the user that the data and plot is shown and that is it, I repeat do not mention anything else", ui="plot", data=data.to_json())
             results.append(toolCall)
          elif tool.name == "get_connected_devices":
             deviceNames = argJson["deviceNames"]
             devices: List[Device] = get_connected_devices(deviceNames)
             arrayString = [device.to_json() for device in devices]
             values = json.dumps([device.to_llm_output() for device in devices])
-            toolCall = ToolResult(name=tool.name, result="Here are the fetced devices: "+values+" this will be shown to the user in the UI above", ui="cards", data=arrayString)
+            toolCall = ToolResult(name=tool.name, result="Here are the fetced devices: "+values+" this will be shown to the user in the UI above, so ONLY inform the user that the devices are shown above and thats it!", ui="cards", data=arrayString)
             results.append(toolCall)
          elif tool.name == "get_location":
             location = get_location()
-            toolCall = ToolResult(name=tool.name, result="Extracted the coordinates from the connected GPS the module, inform the user it will be shown above", ui="map", data=location.to_json())
+            toolCall = ToolResult(name=tool.name, result="Extracted the coordinates from the connected GPS the module, inform the user it will be shown above and thats it", ui="map", data=location.to_json())
             results.append(toolCall)
          elif tool.name == "set_servo_angles":
             angles = argJson["angles"]
@@ -254,7 +310,10 @@ def every_period() -> List[PeriodicData]:
          data.append(PeriodicData(name=device.name, y=device.value))
    return data
 
-vega = Vega(onGetDevices=get_devices, onRunTools=run_tools, onEveryPeriod=every_period, period=2)
+def reset_devices():
+   pass
+
+vega = Vega(onGetDevices=get_devices, onRunTools=run_tools, onEveryPeriod=every_period, onReset=reset_devices, period=2)
 
 @vega.add_tool(
     description="Sets the LED name on or off. ", 
@@ -429,9 +488,8 @@ def get_location() -> MapTool:
          NMEA_buff = (GPGGA_buffer.split(','))               #store comma separated data in buffer
          GPS_Info()                                          #get time, latitude, longitude]
    except Exception as e:
-      print("Error: ", e)
-      long_in_degrees = long_london
-      lat_in_degrees = lat_london
+      long_in_degrees = long_elec
+      lat_in_degrees = lat_elec
    gps.value = "Latitude: " + str(lat_in_degrees) + " Longitude: " + str(long_in_degrees)
    return MapTool(longitude=long_in_degrees, latitude=lat_in_degrees)
 
@@ -451,11 +509,6 @@ def set_servo_angles(angles: str) -> str:
       SetAngle(int(angles))
    return "No angle given"
 
-def test_output_circuit():
-   pass
-
-def test_input_circuit():
-   pass
 
 vega.run()
 vega.delete_all_data_series()
@@ -470,6 +523,15 @@ with open("devices.json", "w") as text_file:
 status = True
 reset_button_gpio = 5
 GPIO.setup(reset_button_gpio, GPIO.IN)
+
+def reset_devices():
+   print("Devices have restarted")
+   SetAngle(0)
+   set_pin(False, led1_pin)
+   set_pin(False, led2_pin)
+   set_pin(False, led3_pin)
+   set_pin(False, fan_pin)
+   display.lcd_clear()
 
 def reset_components():
    print("Components have restarted")

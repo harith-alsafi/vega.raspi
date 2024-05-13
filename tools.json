@@ -83,7 +83,7 @@
     },
     {
         "name": "capture_image",
-        "description": "Captures an image from the raspberry pi camera and returns the URL"
+        "description": "Captures an image from the raspberry pi camera and returns the description of the captured image"
     },
     {
         "name": "get_connected_devices",

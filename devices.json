@@ -68,7 +68,7 @@
     {
         "name": "ULTS",
         "description": "Ultrasonic distance sensor in cm",
-        "value": "2.9399280548095703",
+        "value": "1.724538803100586",
         "type": "analog",
         "pins": [
             "23",

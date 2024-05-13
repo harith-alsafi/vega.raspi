@@ -189,27 +189,45 @@ def get_devices(names: Optional[list[str]] = None) -> list[Device]:
          device.run_call(None)
       return devices
 
-def run_all_tool(tools: list[RunTool], isEvaluation: bool) -> list[ToolResult]:
+
+
+def run_all_tool(tools: list[RunTool], isEvaluation: bool = False) -> list[ToolResult]:
    if tools:
       results = []
       for tool in tools:
          print(tool.to_json())
          argJson = json.loads(tool.arguments)
          if tool.name == "set_led":
-            ledName =  argJson["name"]
-            value = argJson["value"]
-            set_led(ledName, value)
-            toolCall = ToolResult(name=tool.name, result="LED is now " + value)
-            results.append(toolCall)
+            try:
+               ledName =  argJson["name"]
+               value = argJson["value"]
+               if isEvaluation == False:
+                  set_led(ledName, value)
+               toolCall = ToolResult(name=tool.name, result="LED is now " + value)
+               results.append(toolCall)
+            except Exception as e:
+               toolCall = ToolResult(name=tool.name, result="Couldn't toggle LED, because " + str(e))
+               results.append(toolCall)
          elif tool.name == "print_lcd":
-            text = argJson["text"]
-            print_lcd(text)
-            toolCall = ToolResult(name=tool.name, result="LCD is now " + text)
-            results.append(toolCall)
+            try:
+               text = argJson["text"]
+               if isEvaluation == False:
+                  print_lcd(text)
+               toolCall = ToolResult(name=tool.name, result="LCD is now " + text)
+               results.append(toolCall)
+            except Exception as e:
+               toolCall = ToolResult(name=tool.name, result="Couldn't write to LCD, because " + str(e))
+               results.append(toolCall)
          elif tool.name == "capture_image":
-            url = capture_image()
-            toolCall = ToolResult(name=tool.name, result="ONLY inform the user that the image is successfully captured", ui="image", data=url)
-            results.append(toolCall)
+            try:
+               url = "https://st3.depositphotos.com/12760300/35102/i/450/depositphotos_351021910-stock-photo-close-computer-green-microcircuits-lie.jpg"
+               if isEvaluation == False:
+                  url = capture_image()
+               toolCall = ToolResult(name=tool.name, result="ONLY inform the user that the image is successfully captured", ui="image", data=url)
+               results.append(toolCall)
+            except Exception as e:
+               toolCall = ToolResult(name=tool.name, result="Couldn't capture the image because " + str(e))
+               results.append(toolCall)
          elif tool.name == "get_raspberry_stats":
             stats = get_raspberry_stats()
             toolCall = ToolResult(name=tool.name, result="Inform the user that the CPU, RAM, disk and uptime has been extracted, DON'T mention any values", ui="table", data=stats)
@@ -232,75 +250,32 @@ def run_all_tool(tools: list[RunTool], isEvaluation: bool) -> list[ToolResult]:
             toolCall = ToolResult(name=tool.name, result="Extracted the coordinates from the connected GPS the module, inform the user it will be shown above and thats it", ui="map", data=location.to_json())
             results.append(toolCall)
          elif tool.name == "set_servo_angles":
-            angles = argJson["angles"]
-            output = set_servo_angles(angles)
-            toolCall = ToolResult(name=tool.name, result="Servo has been set to the given angles", data=output)
-            results.append(toolCall)
+            try:
+               angles = argJson["angles"]
+               output = ""
+               if isEvaluation == False:
+                  output = set_servo_angles(angles)
+               toolCall = ToolResult(name=tool.name, result="Servo has been set to the given angles", data=output)
+               results.append(toolCall)
+            except Exception as e:
+               toolCall = ToolResult(name=tool.name, result="Couldn't set the servo angles because " + str(e))
+               results.append(toolCall)
          elif tool.name == "set_fan":
-            value = argJson["value"]
-            set_fan(value)
-            toolCall = ToolResult(name=tool.name, result="Fan is now " + value)
-            results.append(toolCall)
+            try:
+               value = argJson["value"]
+               if isEvaluation == False:
+                  set_fan(value)
+               toolCall = ToolResult(name=tool.name, result="Fan is now " + value)
+               results.append(toolCall)
+            except Exception as e:
+               toolCall = ToolResult(name=tool.name, result="Couldn't set the fan because " + str(e))
+               results.append(toolCall)
       return results
    return []
 
 
 def run_tools(tools: list[RunTool]) -> list[ToolResult]:
-   if tools:
-      results = []
-      for tool in tools:
-         print(tool.to_json())
-         argJson = json.loads(tool.arguments)
-         if tool.name == "set_led":
-            ledName =  argJson["name"]
-            value = argJson["value"]
-            set_led(ledName, value)
-            toolCall = ToolResult(name=tool.name, result="LED is now " + value)
-            results.append(toolCall)
-         elif tool.name == "print_lcd":
-            text = argJson["text"]
-            print_lcd(text)
-            toolCall = ToolResult(name=tool.name, result="LCD is now " + text)
-            results.append(toolCall)
-         elif tool.name == "capture_image":
-            url = capture_image()
-            toolCall = ToolResult(name=tool.name, result="ONLY inform the user that the image is successfully captured", ui="image", data=url)
-            results.append(toolCall)
-         elif tool.name == "get_raspberry_stats":
-            stats = get_raspberry_stats()
-            toolCall = ToolResult(name=tool.name, result="Inform the user that the CPU, RAM, disk and uptime has been extracted, DON'T mention any values", ui="table", data=stats)
-            results.append(toolCall)
-         elif tool.name == "get_recorded__sensor_data":
-            sensorNames = argJson["sensorNames"]
-            interval = argJson["interval"]
-            data: DataPlot = get_recorded__sensor_data(sensorNames, interval)
-            toolCall = ToolResult(name=tool.name, result="ONLY inform the user that the data and plot is shown and that is it, I repeat do not mention anything else", ui="plot", data=data.to_json())
-            results.append(toolCall)
-         elif tool.name == "get_connected_devices":
-            deviceNames = argJson["deviceNames"]
-            devices: List[Device] = get_connected_devices(deviceNames)
-            arrayString = [device.to_json() for device in devices]
-            values = json.dumps([device.to_llm_output() for device in devices])
-            toolCall = ToolResult(name=tool.name, result="Here are the fetced devices: "+values+" this will be shown to the user in the UI above, so ONLY inform the user that the devices are shown above and thats it!", ui="cards", data=arrayString)
-            results.append(toolCall)
-         elif tool.name == "get_location":
-            location = get_location()
-            toolCall = ToolResult(name=tool.name, result="Extracted the coordinates from the connected GPS the module, inform the user it will be shown above and thats it", ui="map", data=location.to_json())
-            results.append(toolCall)
-         elif tool.name == "set_servo_angles":
-            angles = argJson["angles"]
-            output = set_servo_angles(angles)
-            toolCall = ToolResult(name=tool.name, result="Servo has been set to the given angles", data=output)
-            results.append(toolCall)
-         elif tool.name == "set_fan":
-            value = argJson["value"]
-            set_fan(value)
-            toolCall = ToolResult(name=tool.name, result="Fan is now " + value)
-            results.append(toolCall)
-      return results
-   return [
-   
-   ]
+   return run_all_tool(tools, False)
 
 def every_period() -> List[PeriodicData]:
    data: List[PeriodicData] = []
@@ -311,7 +286,13 @@ def every_period() -> List[PeriodicData]:
    return data
 
 def reset_devices():
-   pass
+   print("Devices have restarted")
+   SetAngle(0)
+   set_pin(False, led1_pin)
+   set_pin(False, led2_pin)
+   set_pin(False, led3_pin)
+   set_pin(False, fan_pin)
+   display.lcd_clear()
 
 vega = Vega(onGetDevices=get_devices, onRunTools=run_tools, onEveryPeriod=every_period, onReset=reset_devices, period=2)
 
@@ -432,7 +413,7 @@ def print_lcd(text: str):
    lcd.value = text
 
 @vega.add_tool(
-   description="Captures an image from the raspberry pi camera and returns the URL", 
+   description="Captures an image from the raspberry pi camera and returns the description of the captured image" 
 )
 def capture_image() -> str:
    imgName = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -524,15 +505,6 @@ status = True
 reset_button_gpio = 5
 GPIO.setup(reset_button_gpio, GPIO.IN)
 
-def reset_devices():
-   print("Devices have restarted")
-   SetAngle(0)
-   set_pin(False, led1_pin)
-   set_pin(False, led2_pin)
-   set_pin(False, led3_pin)
-   set_pin(False, fan_pin)
-   display.lcd_clear()
-
 def reset_components():
    print("Components have restarted")
    global button_count
@@ -569,6 +541,8 @@ def test_componets():
    print("Press limit switch")
    while GPIO.input(button_gpio) == GPIO.LOW:
       time.sleep(0.1)
+      
+
       
 while status:
    switch_value = int(GPIO.input(switch_gpio) == GPIO.HIGH)

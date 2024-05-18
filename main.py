@@ -247,7 +247,7 @@ def run_all_tool(tools: list[RunTool], isEvaluation: bool = False) -> list[ToolR
             results.append(toolCall)
          elif tool.name == "get_location":
             location = get_location()
-            toolCall = ToolResult(name=tool.name, result="Extracted the coordinates from the connected GPS the module, inform the user it will be shown above and thats it", ui="map", data=location.to_json())
+            toolCall = ToolResult(name=tool.name, result="Extracted the coordinates from the connected GPS the module, the location is in leeds, inform the user that a map will be shown above and thats it", ui="map", data=location.to_json())
             results.append(toolCall)
          elif tool.name == "set_servo_angles":
             try:
@@ -350,6 +350,7 @@ def get_recorded__sensor_data(sensorNames: str, interval: str) -> DataPlot:
       device = find_device(sensorNames)
       if device and device.hasRecordedData:
          deviceData = vega.get_all_data_series_by_seconds(sensorNames, seconds)
+         print(deviceData)
          data = [DataSeries(name=sensorNames, data=deviceData)]
          plot = DataPlot(title=sensorNames, x_label="Time (s)", y_label="Values", data=data)
          return plot
@@ -408,7 +409,6 @@ def dynamic_format(input_string: str) ->str:
 )
 def print_lcd(text: str):
    display.lcd_clear()
-
    display.lcd_display_string(text, 1) 
    lcd.value = text
 
@@ -509,6 +509,7 @@ def reset_components():
    print("Components have restarted")
    global button_count
    button_count = 0
+   button.value = 0
    vega.delete_all_data_series()
    SetAngle(0)
    set_pin(False, led1_pin)
@@ -549,6 +550,7 @@ while status:
    reset_button_value = int(GPIO.input(reset_button_gpio) == GPIO.HIGH)
    if GPIO.input(button_gpio) == GPIO.HIGH:
       button_count += 1
+      button.value = button_count
    if switch_value == 0 and reset_button_value == 1:
       reset_components()
    if switch_value == 1 and reset_button_value == 1:
